@@ -13,6 +13,7 @@
 
 #include "IControl.h"
 #include "IPopupMenuControl.h"
+#include <CoreFoundation/CoreFoundation.h>
 
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
@@ -151,6 +152,12 @@ bool IGraphicsMac::WindowIsOpen()
   return mView;
 }
 
+void IGraphicsMac::AttachGestureRecognizer(EGestureType type)
+{
+  IGraphics::AttachGestureRecognizer(type);
+  [(IGRAPHICS_VIEW*) mView attachGestureRecognizer:type];
+}
+
 void IGraphicsMac::PlatformResize(bool parentHasResized)
 {
   if (mView)
@@ -275,7 +282,7 @@ void IGraphicsMac::GetMouseLocation(float& x, float&y) const
   ScreenToPoint(x, y);
 }
 
-EMsgBoxResult IGraphicsMac::ShowMessageBox(const char* str, const char* caption, EMsgBoxType type, IMsgBoxCompletionHanderFunc completionHandler)
+EMsgBoxResult IGraphicsMac::ShowMessageBox(const char* str, const char* caption, EMsgBoxType type, EMsgBoxIcon icon,IMsgBoxCompletionHanderFunc completionHandler)
 {
   ReleaseMouseCapture();
 
@@ -284,38 +291,139 @@ EMsgBoxResult IGraphicsMac::ShowMessageBox(const char* str, const char* caption,
   if (!str) str= "";
   if (!caption) caption= "";
   
-  NSString *msg = (NSString *) CFStringCreateWithCString(NULL,str,kCFStringEncodingUTF8);
-  NSString *cap = (NSString *) CFStringCreateWithCString(NULL,caption,kCFStringEncodingUTF8);
- 
-  msg = msg ? msg : (NSString *) CFStringCreateWithCString(NULL, str, kCFStringEncodingASCII);
-  cap = cap ? cap : (NSString *) CFStringCreateWithCString(NULL, caption, kCFStringEncodingASCII);
+  //convert the strings from char* to CFStringRef
+  CFStringRef header_ref = CFStringCreateWithCString(NULL, caption, kCFStringEncodingUTF8);
+  CFStringRef message_ref = CFStringCreateWithCString( NULL, str, kCFStringEncodingUTF8);
+  
+  CFOptionFlags flgresult, icont;  //result code from the message box
+  switch (icon)
+  {
+    case kMB_ICONHAND:
+      icont = kCFUserNotificationStopAlertLevel;
+      break;
+    case kMB_ICONEXCLAMATION:
+      icont = kCFUserNotificationCautionAlertLevel;
+      break;
+    default:
+      icont = kCFUserNotificationPlainAlertLevel;
+      break;
+  }
+  
   
   switch (type)
   {
     case kMB_OK:
-      NSRunAlertPanel(msg, @"%@", @"OK", @"", @"", cap);
+      CFUserNotificationDisplayAlert(
+                                     0, // no timeout
+                                     icont, //change it depending message_type flags ( MB_ICONASTERISK.... etc.)
+                                     NULL, //icon url, use default, you can change it depending message_type flags
+                                     NULL, //not used
+                                     NULL, //localization of strings
+                                     header_ref, //header text
+                                     message_ref, //message text
+                                     CFSTR("OK"), //default "ok" text in button
+                                     NULL, //alternate button title
+                                     NULL, //other button title, null--> no other button
+                                     &flgresult //response flags
+                                     );
       result = kOK;
       break;
     case kMB_OKCANCEL:
-      result = NSRunAlertPanel(msg, @"%@", @"OK", @"Cancel", @"", cap);
-      result = result ? kOK : kCANCEL;
+      
+      CFUserNotificationDisplayAlert(
+                                      0, // no timeout
+                                      icont, //change it depending message_type flags ( MB_ICONASTERISK.... etc.)
+                                      NULL, //icon url, use default, you can change it depending message_type flags
+                                      NULL, //not used
+                                      NULL, //localization of strings
+                                      header_ref, //header text
+                                      message_ref, //message text
+                                      CFSTR("OK"), //default "ok" text in button
+                                      CFSTR("Cancel"), //alternate button title
+                                      NULL, //other button title, null--> no other button
+                                      &flgresult //response flags
+                                      );
+      if (flgresult == kCFUserNotificationDefaultResponse )
+        result = kOK;
+      else
+        result = kCANCEL;
       break;
     case kMB_YESNO:
-      result = NSRunAlertPanel(msg, @"%@", @"Yes", @"No", @"", cap);
-      result = result ? kYES : kNO;
+      CFUserNotificationDisplayAlert(
+                                      0, // no timeout
+                                      icont, //change it depending message_type flags ( MB_ICONASTERISK.... etc.)
+                                      NULL, //icon url, use default, you can change it depending message_type flags
+                                      NULL, //not used
+                                      NULL, //localization of strings
+                                      header_ref, //header text
+                                      message_ref, //message text
+                                      CFSTR("Yes"), //default "ok" text in button
+                                      CFSTR("No"), //alternate button title
+                                      NULL, //other button title, null--> no other button
+                                      &flgresult //response flags
+                                      );
+      if (flgresult == kCFUserNotificationDefaultResponse )
+        result = kYES;
+      else
+        result = kNO;
       break;
     case kMB_RETRYCANCEL:
-      result = NSRunAlertPanel(msg, @"%@", @"Retry", @"Cancel", @"", cap);
-      result = result ? kRETRY : kCANCEL;
+      CFUserNotificationDisplayAlert(
+                                      0, // no timeout
+                                      icont, //change it depending message_type flags ( MB_ICONASTERISK.... etc.)
+                                      NULL, //icon url, use default, you can change it depending message_type flags
+                                      NULL, //not used
+                                      NULL, //localization of strings
+                                      header_ref, //header text
+                                      message_ref, //message text
+                                      CFSTR("Retry"), //default "ok" text in button
+                                      CFSTR("Cancel"), //alternate button title
+                                      NULL, //other button title, null--> no other button
+                                      &flgresult //response flags
+                                      );
+      if (flgresult == kCFUserNotificationDefaultResponse )
+        result = kRETRY;
+      else
+        result = kCANCEL;
       break;
     case kMB_YESNOCANCEL:
-      result = NSRunAlertPanel(msg, @"%@", @"Yes", @"Cancel", @"No", cap);
-      result = (result == 1) ? kYES : (result == -1) ? kNO : kCANCEL;
+      CFUserNotificationDisplayAlert(
+                                      0, // no timeout
+                                      icont, //change it depending message_type flags ( MB_ICONASTERISK.... etc.)
+                                      NULL, //icon url, use default, you can change it depending message_type flags
+                                      NULL, //not used
+                                      NULL, //localization of strings
+                                      header_ref, //header text
+                                      message_ref, //message text
+                                      CFSTR("Yes"), //default "ok" text in button
+                                      CFSTR("No"), //alternate button title
+                                      CFSTR("Cancel"), //other button title, null--> no other button
+                                      &flgresult //response flags
+                                      );
+      switch (flgresult)
+      {
+        case kCFUserNotificationDefaultResponse:
+          result = kYES;
+          break;
+        case kCFUserNotificationAlternateResponse:
+          result = kNO;
+          break;
+        default:
+          result = kCANCEL;
+          break;
+      }
       break;
   }
   
-  [msg release];
-  [cap release];
+  //launch the message box
+  
+  
+  //Clean up the strings
+  CFRelease( header_ref );
+  CFRelease( message_ref );
+  
+  //Convert the result
+  
   
   if(completionHandler)
     completionHandler(static_cast<EMsgBoxResult>(result));

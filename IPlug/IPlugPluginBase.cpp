@@ -544,29 +544,56 @@ void IPluginBase::DumpPresetSrcCode(const char* filename, const char* paramEnumN
     sDumped = true;
     int i, n = NParams();
     FILE* fp = fopen(filename, "w");
-    fprintf(fp, "  MakePresetFromNamedParams(\"name\", %d", n);
-    for (i = 0; i < n; ++i)
+    if (paramEnumNames)
     {
-      const IParam* pParam = GetParam(i);
-      char paramVal[32];
-      switch (pParam->Type())
+      fprintf(fp, "  MakePresetFromNamedParams(\"name\", %d", n);
+      for (i = 0; i < n; ++i)
       {
+        const IParam* pParam = GetParam(i);
+        char paramVal[32];
+        switch (pParam->Type())
+        {
         case IParam::kTypeBool:
           sprintf(paramVal, "%s", (pParam->Bool() ? "true" : "false"));
           break;
         case IParam::kTypeInt:
-          sprintf(paramVal, "%d", pParam->Int());
-          break;
         case IParam::kTypeEnum:
+        case IParam::kTypeNote:
           sprintf(paramVal, "%d", pParam->Int());
           break;
         case IParam::kTypeDouble:
         default:
           sprintf(paramVal, "%.6f", pParam->Value());
           break;
+        }
+        fprintf(fp, ",\n    %s, %s", paramEnumNames[i], paramVal);
       }
-      fprintf(fp, ",\n    %s, %s", paramEnumNames[i], paramVal);
     }
+    else {
+      fprintf(fp, "  MakePreset(\"name\"");
+      for (i = 0; i < n; ++i)
+      {
+        const IParam* pParam = GetParam(i);
+        char paramVal[32];
+        switch (pParam->Type())
+        {
+        case IParam::kTypeBool:
+          sprintf(paramVal, "%s", (pParam->Bool() ? "true" : "false"));
+          break;
+        case IParam::kTypeInt:
+        case IParam::kTypeEnum:
+        case IParam::kTypeNote:
+          sprintf(paramVal, "%d", pParam->Int());
+          break;
+        case IParam::kTypeDouble:
+        default:
+          sprintf(paramVal, "%.6f", pParam->Value());
+          break;
+        }
+        fprintf(fp, ", %s", paramVal);
+      }
+    }
+
     fprintf(fp, ");\n");
     fclose(fp);
   }
@@ -597,7 +624,7 @@ void IPluginBase::DumpAllPresetsBlob(const char* filename) const
 void IPluginBase::DumpPresetBlob(const char* filename) const
 {
   FILE* fp = fopen(filename, "w");
-  fprintf(fp, "MakePresetFromBlob(\"name\", \"");
+  fprintf(fp, "MakePresetFromBlob(\"%s\", \"", mPresets.Get(mCurrentPresetIdx)->mName);
   
   char buf[MAX_BLOB_LENGTH];
   
@@ -641,7 +668,18 @@ bool IPluginBase::SaveProgramAsFXP(const char* file) const
 {
   if (CStringHasContents(file))
   {
-    FILE* fp = fopen(file, "wb");
+    // Z: convert utf-8 to widechar
+    int wlen = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, file, -1, nullptr, 0);
+    if (wlen == 0)
+      return false;
+    wchar_t* wfilename = new wchar_t[wlen];
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, file, -1, wfilename, wlen) == 0)
+    {
+      delete[] wfilename;
+      return false;
+    }
+    FILE* fp = _wfopen(wfilename, L"wb");
+    delete[] wfilename;
     
     IByteChunk pgm;
     
@@ -714,7 +752,18 @@ bool IPluginBase::SaveBankAsFXB(const char* file) const
 {
   if (CStringHasContents(file))
   {
-    FILE* fp = fopen(file, "wb");
+    // Z: convert utf-8 to widechar
+    int wlen = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, file, -1, nullptr, 0);
+    if (wlen == 0)
+      return false;
+    wchar_t* wfilename = new wchar_t[wlen];
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, file, -1, wfilename, wlen) == 0)
+    {
+      delete[] wfilename;
+      return false;
+    }
+    FILE* fp = _wfopen(wfilename, L"wb");
+    delete[] wfilename;
     
     IByteChunk bnk;
     
@@ -819,8 +868,23 @@ bool IPluginBase::LoadProgramFromFXP(const char* file)
 {
   if (CStringHasContents(file))
   {
-    FILE* fp = fopen(file, "rb");
-    
+    FILE* fp = nullptr;
+#ifdef OS_WIN
+    // Z: convert utf-8 to widechar
+    int wlen = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, file, -1, nullptr, 0);
+    if (wlen == 0)
+      return false;
+    wchar_t* wfilename = new wchar_t[wlen];
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, file, -1, wfilename, wlen) == 0)
+    {
+      delete[] wfilename;
+      return false;
+    }
+    fp = _wfopen(wfilename, L"rb");
+    delete[] wfilename;
+#else
+    fp = fopen(file, "rb");
+#endif    
     if (fp)
     {
       IByteChunk pgm;
@@ -910,7 +974,23 @@ bool IPluginBase::LoadBankFromFXB(const char* file)
 {
   if (CStringHasContents(file))
   {
-    FILE* fp = fopen(file, "rb");
+    FILE* fp = nullptr;
+#ifdef OS_WIN
+    // Z: convert utf-8 to widechar
+    int wlen = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, file, -1, nullptr, 0);
+    if (wlen == 0)
+      return false;
+    wchar_t* wfilename = new wchar_t[wlen];
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, file, -1, wfilename, wlen) == 0)
+    {
+      delete[] wfilename;
+      return false;
+    }
+    fp = _wfopen(wfilename, L"rb");
+    delete[] wfilename;
+#else
+    fp = fopen(file, "rb");
+#endif
     
     if (fp)
     {

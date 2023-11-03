@@ -139,7 +139,7 @@ public:
   virtual void OnTouchCancelled(float x, float y, const IMouseMod& mod) {}
 
   /** Implement to do something when something was drag 'n dropped onto this control */
-  virtual void OnDrop(const char* str) {};
+  virtual void OnDrop(const char* str, float x, float y) {};
 
   /** Implement to do something when graphics is scaled globally (e.g. moves to different DPI screen) */
   virtual void OnRescale() {}
@@ -404,6 +404,9 @@ public:
 
   /** This is an idle call from the GUI thread, only active if USE_IDLE_CALLS is defined. /todo check this */
   virtual void OnGUIIdle() {}
+
+  /** This is an called when focus is lost. /todo check this */
+  virtual void OnLostFocus() {}
   
   /** Set the control's tag. Controls can be given tags, in order to direct messages to them. @see Control Tags
    * @param tag A unique integer to identify this control */
@@ -1148,6 +1151,7 @@ public:
   void OnMouseDown(float x, float y, const IMouseMod& mod) override
   {
     mMouseDown = true;
+    mMouseDragValue = GetValue();
 
     if (mHideCursorOnDrag)
       GetUI()->HideMouseCursor(true, true);
@@ -1178,6 +1182,7 @@ protected:
   EDirection mDirection;
   double mGearing;
   bool mMouseDown = false;
+  double mMouseDragValue = 0.0;
 };
 
 /** A base class for slider/fader controls, to handle mouse action and Sender. */
@@ -1202,6 +1207,7 @@ protected:
   float mHandleSize;
   double mGearing;
   bool mMouseDown = false;
+  double mMouseDragValue = 0.0;
 };
 
 /** A base class for mult-strip/track controls, such as multi-sliders, meters */
@@ -1653,7 +1659,11 @@ public:
   const char* GetStr() const { return mStr.Get(); }
   
   void SetBoundsBasedOnStr();
-  
+  // Added by bluelab
+  const IColor& GetTextColor() { return IControl::mText.mFGColor; }
+  void SetTextColor(const IColor& color) { IControl::mText.mFGColor = color; };
+  const IColor& GetTextBGColor() { return mBGColor; }
+  void SetTextBGColor(const IColor& color) { mBGColor = color; };
 protected:
   WDL_String mStr;
   IColor mBGColor;

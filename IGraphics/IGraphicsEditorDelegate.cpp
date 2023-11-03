@@ -60,7 +60,7 @@ void IGEditorDelegate::CloseWindow()
 }
 
 void IGEditorDelegate::SetScreenScale(double scale)
-{
+{    
   if (GetUI())
     mGraphics->SetScreenScale(static_cast<int>(std::round(scale)));
 }
@@ -187,6 +187,46 @@ int IGEditorDelegate::UnserializeEditorSize(const IByteChunk& data, int startPos
   }
     
   return startPos;
+}
+
+void IGEditorDelegate::OnParamChangeUI(int paramIdx, EParamSource source)
+{
+  // For the host automation case
+  if (source == kHost)
+  {
+    IGraphics* pGraphics = GetUI();
+    if (pGraphics != NULL)
+    {
+      for (int c = 0; c < pGraphics->NControls(); c++)
+      {
+        IControl* control = pGraphics->GetControl(c);
+        if (control != NULL)
+        {
+          // One control can have several params
+          for (int i = 0; i < control->NVals(); i++)
+          {
+            int idx = control->GetParamIdx(i);
+            if (idx == paramIdx)
+            {
+              double value = GetParam(idx)->GetNormalized();
+              if (!control->IsDisabled()) // Dont animate disabled controls
+              {
+                control->SetValue(value, i);
+                control->SetDirty(false);
+              }
+            }
+            // Don't break here in case we have several controls with the same param
+          }
+        }
+      }
+    }
+  }
+}
+
+void IGEditorDelegate::ResetLastEditorSize()
+{
+  mLastWidth = 0;
+  mLastHeight = 0;
 }
 
 bool IGEditorDelegate::SerializeEditorState(IByteChunk& chunk) const

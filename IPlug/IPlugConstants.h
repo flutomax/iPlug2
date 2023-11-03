@@ -104,7 +104,7 @@ static const int MAX_PARAM_DISPLAY_PRECISION = 6;
 #define PARAM_UNINIT 99.99e-9
 
 #ifndef MAX_BLOB_LENGTH
-#define MAX_BLOB_LENGTH 2048
+#define MAX_BLOB_LENGTH 32768
 #endif
 
 #ifndef IDLE_TIMER_RATE
@@ -238,6 +238,7 @@ enum EHost
   kHostiZotopeRX,		
   kHostSAVIHost,		
   kHostBlueCat,			
+  kHostMixbus32C
 
   // These hosts don't report the host name:
   // EnergyXT2

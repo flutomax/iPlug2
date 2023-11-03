@@ -21,6 +21,12 @@
 #include <codecvt>
 #include <locale>
 
+#ifdef _MSC_VER
+#if (_MSC_VER >= 1900 /* VS 2015*/) && (_MSC_VER <= 1920 /* VS 2019 */)
+std::locale::id std::codecvt<char16_t, char, _Mbstatet>::id;
+#endif
+#endif
+
 //TODO: use either wdlutf8, iplug2 UTF8/UTF16 or cpp11 wstring_convert
 using StringConvert = std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>;
 
@@ -300,7 +306,7 @@ bool ITextEntryControl::OnKeyDown(float x, float y, const IKeyPress& key)
               break;
             if (key.VK >= kVK_NUMPAD0 && key.VK <= kVK_NUMPAD9)
               break;
-            if (stbKey == '+' || stbKey == '-' || stbKey == '.')
+            if (stbKey == '+' || stbKey == '-' || stbKey == '.' || stbKey == ',') // ',' z> may be localized decimal separator
               break;
             stbKey = 0;
             break;
@@ -332,6 +338,11 @@ void ITextEntryControl::OnEndAnimation()
 {
   if(mEditing)
     SetDirty(true);
+}
+
+void ITextEntryControl::OnLostFocus()
+{
+  DismissEdit();
 }
 
 void ITextEntryControl::CopySelection()
@@ -400,6 +411,11 @@ char16_t ITextEntryControl::GetChar(ITextEntryControl* _this, int pos)
 int ITextEntryControl::GetLength(ITextEntryControl* _this)
 {
   return static_cast<int>(_this->mEditString.size());
+}
+
+int ITextEntryControl::GetParamIndex(ITextEntryControl* _this)
+{
+  return _this->fParamIndex;
 }
 
 //static
@@ -523,6 +539,7 @@ float ITextEntryControl::MeasureCharWidth(char16_t c, char16_t nc)
 
 void ITextEntryControl::CreateTextEntry(int paramIdx, const IText& text, const IRECT& bounds, int length, const char* str)
 {
+  fParamIndex = paramIdx;
   SetTargetAndDrawRECTs(bounds);
   SetText(text);
   mText.mFGColor = mText.mTextEntryFGColor;

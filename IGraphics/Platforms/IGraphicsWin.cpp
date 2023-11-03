@@ -29,7 +29,7 @@ using namespace igraphics;
 #pragma warning(disable:4311) // Pointer size cast mismatch.
 
 static int nWndClassReg = 0;
-static const char* wndClassName = "IPlugWndClass";
+static const char* wndClassName = "TPlugWndClass";
 static double sFPS = 0.0;
 
 #define PARAM_EDIT_ID 99
@@ -668,9 +668,6 @@ LRESULT CALLBACK IGraphicsWin::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARA
 
     case WM_CTLCOLOREDIT:
     {
-      if(!pGraphics->mParamEditWnd)
-        return 0;
-
       const IText& text = pGraphics->mEditText;
       HDC dc = (HDC) wParam;
       SetBkColor(dc, RGB(text.mTextEntryBGColor.R, text.mTextEntryBGColor.G, text.mTextEntryBGColor.B));
@@ -704,6 +701,7 @@ LRESULT CALLBACK IGraphicsWin::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARA
     }
     case WM_KILLFOCUS:
     {
+      pGraphics->OnLostFocus();
       return 0;
     }
   }
@@ -744,6 +742,10 @@ LRESULT CALLBACK IGraphicsWin::ParamEditProc(HWND hWnd, UINT msg, WPARAM wParam,
               else if (c == '-') break;
               else if (c == '+') break;
               else if (c == '.') break;
+              else return 0;
+            case IParam::kTypeNote:
+              if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'G') || (c >= 'a' && c <= 'g') || (c == '#'))
+                break;
               else return 0;
             default:
               break;
@@ -988,8 +990,17 @@ ECursor IGraphicsWin::SetMouseCursor(ECursor cursorType)
     case ECursor::SIZEALL:          cursor = LoadCursor(NULL, IDC_SIZEALL);         break;
     case ECursor::INO:              cursor = LoadCursor(NULL, IDC_NO);              break;
     case ECursor::HAND:             cursor = LoadCursor(NULL, IDC_HAND);            break;
+    case ECursor::HANDCLOSED:       cursor = LoadCursor(mHInstance, MAKEINTRESOURCE(CURSOR_HANDCLOSED)); break;
+    case ECursor::HANDOPEN:         cursor = LoadCursor(mHInstance, MAKEINTRESOURCE(CURSOR_HANDOPEN)); break;
     case ECursor::APPSTARTING:      cursor = LoadCursor(NULL, IDC_APPSTARTING);     break;
     case ECursor::HELP:             cursor = LoadCursor(NULL, IDC_HELP);            break;
+    case ECursor::DRAGNDROP:
+    {
+      HMODULE oleMod = LoadLibraryEx(TEXT("ole32.dll"), NULL, LOAD_LIBRARY_AS_DATAFILE);
+      cursor = LoadCursor(oleMod, MAKEINTRESOURCE(3));
+      FreeLibrary(oleMod);
+    }
+    break;
     default:
       cursor = LoadCursor(NULL, IDC_ARROW);
   }
@@ -1075,15 +1086,33 @@ void IGraphicsWin::DeactivateGLContext()
 }
 #endif
 
-EMsgBoxResult IGraphicsWin::ShowMessageBox(const char* text, const char* caption, EMsgBoxType type, IMsgBoxCompletionHanderFunc completionHandler)
+EMsgBoxResult IGraphicsWin::ShowMessageBox(const char* text, const char* caption, EMsgBoxType type, EMsgBoxIcon icon, IMsgBoxCompletionHanderFunc completionHandler)
 {
   ReleaseMouseCapture();
-  
-  EMsgBoxResult result = static_cast<EMsgBoxResult>(MessageBox(GetMainWnd(), text, caption, static_cast<int>(type)));
-  
-  if(completionHandler)
+  int flag = static_cast<int>(type);
+  switch (icon)
+  {
+  case kMB_ICONHAND:
+    flag |= MB_ICONHAND;
+    break;
+  case kMB_ICONQUESTION:
+    flag |= MB_ICONQUESTION;
+    break;
+  case kMB_ICONEXCLAMATION:
+    flag |= MB_ICONEXCLAMATION;
+    break;
+  case kMB_ICONASTERISK:
+    flag |= MB_ICONASTERISK;
+    break;
+  default:
+    break;
+  }
+
+  EMsgBoxResult result = static_cast<EMsgBoxResult>(MessageBox(GetMainWnd(), text, caption, flag));
+
+  if (completionHandler)
     completionHandler(result);
-  
+
   return result;
 }
 
@@ -1111,7 +1140,7 @@ void* IGraphicsWin::OpenWindow(void* pParent)
     RegisterClass(&wndClass);
   }
 
-  mPlugWnd = CreateWindow(wndClassName, "IPlug", WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS, x, y, w, h, mParentWnd, 0, mHInstance, this);
+  mPlugWnd = CreateWindow(wndClassName, "TPlug", WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS, x, y, w, h, mParentWnd, 0, mHInstance, this);
 
   HDC dc = GetDC(mPlugWnd);
   SetPlatformContext(dc);
@@ -1287,6 +1316,11 @@ bool IGraphicsWin::PlatformSupportsMultiTouch() const
   return GetSystemMetrics(SM_DIGITIZER) & NID_MULTI_INPUT;
 }
 
+void IGraphicsWin::SetEditText(IText text)
+{
+  mEditText = text;
+}
+
 IPopupMenu* IGraphicsWin::GetItemMenu(long idx, long& idxInMenu, long& offsetIdx, IPopupMenu& baseMenu)
 {
   long oldIDx = offsetIdx;
@@ -1381,6 +1415,8 @@ HMENU IGraphicsWin::CreateMenu(IPopupMenu& menu, long* pOffsetIdx)
         flags |= MF_DISABLED;
       if (pMenuItem->GetChecked())
         flags |= MF_CHECKED;
+      if (pMenuItem->GetRadio())
+        flags |= MFT_RADIOCHECK | MF_CHECKED;
       else
         flags |= MF_UNCHECKED;
 
@@ -1488,6 +1524,8 @@ void IGraphicsWin::CreatePlatformTextEntry(int paramIdx, const IText& text, cons
   HFontHolder* hfontHolder = hfontStorage.Find(text.mFont);
   GetObject(hfontHolder->mHFont, sizeof(LOGFONT), &lFont);
   lFont.lfHeight = text.mSize * scale;
+  if (text.mAliasing)
+    lFont.lfQuality = NONANTIALIASED_QUALITY;
   mEditFont = CreateFontIndirect(&lFont);
 
   assert(hfontHolder && "font not found - did you forget to load it?");
@@ -1556,46 +1594,74 @@ void IGraphicsWin::PromptForFile(WDL_String& fileName, WDL_String& path, EFileAc
     fileName.Set("");
     return;
   }
-    
+
   wchar_t fnCStr[_MAX_PATH];
   wchar_t dirCStr[_MAX_PATH];
-    
+
   if (fileName.GetLength())
     UTF8ToUTF16(fnCStr, fileName.Get(), _MAX_PATH);
   else
     fnCStr[0] = '\0';
-    
+
   dirCStr[0] = '\0';
-    
+
   //if (!path.GetLength())
   //  DesktopPath(path);
-    
+
   UTF8ToUTF16(dirCStr, path.Get(), _MAX_PATH);
-    
+
   OPENFILENAMEW ofn;
   memset(&ofn, 0, sizeof(OPENFILENAMEW));
-    
+
   ofn.lStructSize = sizeof(OPENFILENAMEW);
-  ofn.hwndOwner = (HWND) GetWindow();
+  ofn.hwndOwner = (HWND)GetWindow();
   ofn.lpstrFile = fnCStr;
   ofn.nMaxFile = _MAX_PATH - 1;
   ofn.lpstrInitialDir = dirCStr;
   ofn.Flags = OFN_PATHMUSTEXIST;
-    
+
   if (CStringHasContents(extensions))
   {
+    wchar_t extStr[1024] = { 0 };
+    wchar_t defExtStr[1024] = { 0 };
+
+    int i, p, n = strlen(extensions);
+    for (i = 0, p = 0; i < n; ++i)
+    {
+      if (extensions[i] == '|')
+        extStr[p++] = '\0';
+      else
+        extStr[p++] = extensions[i];
+    }
+    extStr[p++] = '\0';
+    extStr[p++] = '\0';
+
+    const char* ext = strstr(extensions, "|");
+    ext++;
+    p = 0;
+    while (ext && *ext != '\0')
+    {
+      defExtStr[p++] = *ext;
+      ext++;
+      if (*ext == '|')
+        break;
+    }
+    defExtStr[p++] = '\0';
+
+    //  Old version
+    /*
     wchar_t extStr[256];
     wchar_t defExtStr[16];
     int i, p, n = strlen(extensions);
     bool seperator = true;
-        
+
     for (i = 0, p = 0; i < n; ++i)
     {
       if (seperator)
       {
         if (p)
           extStr[p++] = ';';
-                
+
         seperator = false;
         extStr[p++] = '*';
         extStr[p++] = '.';
@@ -1607,48 +1673,51 @@ void IGraphicsWin::PromptForFile(WDL_String& fileName, WDL_String& path, EFileAc
         extStr[p++] = extensions[i];
     }
     extStr[p++] = '\0';
-        
+
     wcscpy(&extStr[p], extStr);
     extStr[p + p] = '\0';
     ofn.lpstrFilter = extStr;
-        
+
     for (i = 0, p = 0; i < n && extensions[i] != ' '; ++i)
       defExtStr[p++] = extensions[i];
-    
+
     defExtStr[p++] = '\0';
     ofn.lpstrDefExt = defExtStr;
+    */
+    ofn.lpstrFilter = extStr;
+    ofn.lpstrDefExt = defExtStr;
   }
-    
+
   bool rc = false;
-    
+
   switch (action)
   {
-    case EFileAction::Save:
-      ofn.Flags |= OFN_OVERWRITEPROMPT;
-      rc = GetSaveFileNameW(&ofn);
-      break;
-            
-    case EFileAction::Open:
-      default:
-      ofn.Flags |= OFN_FILEMUSTEXIST;
-      rc = GetOpenFileNameW(&ofn);
-      break;
+  case EFileAction::Save:
+    ofn.Flags |= OFN_OVERWRITEPROMPT;
+    rc = GetSaveFileNameW(&ofn);
+    break;
+
+  case EFileAction::Open:
+  default:
+    ofn.Flags |= OFN_FILEMUSTEXIST;
+    rc = GetOpenFileNameW(&ofn);
+    break;
   }
-    
+
   if (rc)
   {
     char drive[_MAX_DRIVE];
     char directoryOutCStr[_MAX_PATH];
-    
+
     WDL_String tempUTF8;
     UTF16ToUTF8(tempUTF8, ofn.lpstrFile);
-    
+
     if (_splitpath_s(tempUTF8.Get(), drive, sizeof(drive), directoryOutCStr, sizeof(directoryOutCStr), NULL, 0, NULL, 0) == 0)
     {
       path.Set(drive);
       path.Append(directoryOutCStr);
     }
-      
+
     fileName.Set(tempUTF8.Get());
   }
   else
@@ -1669,17 +1738,24 @@ void IGraphicsWin::PromptForDirectory(WDL_String& dir)
   bi.lpszTitle = "Choose a Directory";
   
   // must call this if using BIF_USENEWUI
-  ::OleInitialize(NULL);
-  LPITEMIDLIST pIDL = ::SHBrowseForFolder(&bi);
+  OleInitialize(NULL);
+  PIDLIST_ABSOLUTE pidlMyComputer = nullptr;
+  SHGetSpecialFolderLocation(nullptr, CSIDL_DRIVES, &pidlMyComputer);
+  LPITEMIDLIST pIDL = SHBrowseForFolder(&bi);
   
   if(pIDL != NULL)
   {
     char buffer[_MAX_PATH] = {'\0'};
     
-    if(::SHGetPathFromIDList(pIDL, buffer) != 0)
+    if(SHGetPathFromIDList(pIDL, buffer) != 0)
     {
       dir.Set(buffer);
       dir.Append("\\");
+    }
+    else
+    {
+      if (ILIsEqual(pIDL, pidlMyComputer))
+        dir.Set("%ROOT%");  // MyComputer identifier
     }
     
     // free the item id list
@@ -1692,7 +1768,7 @@ void IGraphicsWin::PromptForDirectory(WDL_String& dir)
 
   ReleaseMouseCapture();
   
-  ::OleUninitialize();
+  OleUninitialize();
 }
 
 static UINT_PTR CALLBACK CCHookProc(HWND hdlg, UINT uiMsg, WPARAM wParam, LPARAM lParam)
@@ -1748,23 +1824,11 @@ bool IGraphicsWin::PromptForColor(IColor& color, const char* prompt, IColorPicke
 
 bool IGraphicsWin::OpenURL(const char* url, const char* msgWindowTitle, const char* confirmMsg, const char* errMsgOnFailure)
 {
-  if (confirmMsg && MessageBox(mPlugWnd, confirmMsg, msgWindowTitle, MB_YESNO) != IDYES)
+  WCHAR urlWide[IPLUG_WIN_MAX_WIDE_PATH];
+  UTF8ToUTF16(urlWide, url, IPLUG_WIN_MAX_WIDE_PATH);
+  if (ShellExecuteW(mPlugWnd, L"open", urlWide, 0, 0, SW_SHOWNORMAL) > HINSTANCE(32))
   {
-    return false;
-  }
-  DWORD inetStatus = 0;
-  if (InternetGetConnectedState(&inetStatus, 0))
-  {
-    WCHAR urlWide[IPLUG_WIN_MAX_WIDE_PATH];
-    UTF8ToUTF16(urlWide, url, IPLUG_WIN_MAX_WIDE_PATH);
-    if (ShellExecuteW(mPlugWnd, L"open", urlWide, 0, 0, SW_SHOWNORMAL) > HINSTANCE(32))
-    {
-      return true;
-    }
-  }
-  if (errMsgOnFailure)
-  {
-    MessageBox(mPlugWnd, errMsgOnFailure, msgWindowTitle, MB_OK);
+    return true;
   }
   return false;
 }
@@ -1780,11 +1844,15 @@ void IGraphicsWin::ShowTooltip()
 {
   if (mTooltipIdx > -1)
   {
-    const char* tooltip = GetControl(mTooltipIdx)->GetTooltip();
-    if (tooltip)
+    IControl* ctrl = GetControl(mTooltipIdx);
+    if (ctrl)
     {
-      SetTooltip(tooltip);
-      mShowingTooltip = true;
+      const char* tooltip = ctrl->GetTooltip();
+      if (CStringHasContents(tooltip))
+      {
+        SetTooltip(tooltip);
+        mShowingTooltip = true;
+      }
     }
   }
 }
@@ -1932,7 +2000,12 @@ PlatformFontPtr IGraphicsWin::LoadPlatformFont(const char* fontID, const char* f
   int resSize = 0;
   WDL_String fullPath;
  
-  const EResourceLocation fontLocation = LocateResource(fileNameOrResID, "ttf", fullPath, GetBundleID(), GetWinModuleHandle(), nullptr);
+  EResourceLocation fontLocation = LocateResource(fileNameOrResID, "ttf", fullPath, GetBundleID(), GetWinModuleHandle(), nullptr);
+
+  if (fontLocation == kNotFound)
+  {
+    fontLocation = LocateResource(fileNameOrResID, "otf", fullPath, GetBundleID(), GetWinModuleHandle(), nullptr);
+  }
 
   if (fontLocation == kNotFound)
     return nullptr;
@@ -1959,6 +2032,8 @@ PlatformFontPtr IGraphicsWin::LoadPlatformFont(const char* fontID, const char* f
     case kWinBinary:
     {
       pFontMem = const_cast<void *>(LoadWinResource(fullPath.Get(), "ttf", resSize, GetWinModuleHandle()));
+      if (pFontMem == nullptr)
+        pFontMem = const_cast<void *>(LoadWinResource(fullPath.Get(), "otf", resSize, GetWinModuleHandle()));
       pFont = std::make_unique<InstalledFont>(pFontMem, resSize);
     }
     break;

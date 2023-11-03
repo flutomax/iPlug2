@@ -208,7 +208,7 @@ static int MacKeyEventToVK(NSEvent* pEvent, int& flag)
     {
       [nsMenuItem setIndentationLevel:pMenuItem->GetIsTitle() ? 1 : 0 ];
       [nsMenuItem setEnabled:pMenuItem->GetEnabled() ? YES : NO];
-      [nsMenuItem setState:pMenuItem->GetChecked() ? NSOnState : NSOffState];
+      [nsMenuItem setState:pMenuItem->GetChecked() || pMenuItem->GetRadio() ? NSOnState : NSOffState];
     }
   }
 
@@ -969,7 +969,10 @@ static void MakeCursorFromName(NSCursor*& cursor, const char *name)
       break;
     }
     case ECursor::INO: pCursor = [NSCursor operationNotAllowedCursor]; break;
+
     case ECursor::HAND: pCursor = [NSCursor pointingHandCursor]; break;
+    case ECursor::HANDCLOSED: pCursor = [NSCursor closedHandCursor]; break;
+    case ECursor::HANDOPEN: pCursor = [NSCursor openHandCursor]; break;
     case ECursor::APPSTARTING:
       if ([NSCursor respondsToSelector:@selector(busyButClickableCursor)])
         pCursor = [NSCursor performSelector:@selector(busyButClickableCursor)];
@@ -979,6 +982,7 @@ static void MakeCursorFromName(NSCursor*& cursor, const char *name)
         pCursor = [NSCursor performSelector:@selector(_helpCursor)];
       helpRequested = true;
       break;
+    case ECursor::DRAGNDROP: pCursor = [NSCursor dragCopyCursor]; break;
     default: pCursor = [NSCursor arrowCursor]; break;
   }
 
@@ -1217,6 +1221,181 @@ static void MakeCursorFromName(NSCursor*& cursor, const char *name)
                                                           self.frame.size.height * scale)];
 }
 #endif
+
+- (void) attachGestureRecognizer: (EGestureType) type
+{
+  NSGestureRecognizer* gestureRecognizer;
+  
+  switch (type)
+  {
+    case EGestureType::DoubleTap:
+    case EGestureType::TripleTap:
+    {
+      gestureRecognizer = [[NSClickGestureRecognizer alloc] initWithTarget:self action:@selector(onTapGesture:)];
+      [(NSClickGestureRecognizer*) gestureRecognizer setNumberOfClicksRequired: type == EGestureType::DoubleTap ? 2 : 3];
+      //[(NSClickGestureRecognizer*) gestureRecognizer setNumberOfTouchesRequired:1];
+      break;
+    }
+    case EGestureType::LongPress1:
+    case EGestureType::LongPress2:
+    {
+      gestureRecognizer = [[NSPressGestureRecognizer alloc] initWithTarget:self action:@selector(onLongPressGesture:)];
+      //[(NSPressGestureRecognizer*) gestureRecognizer setNumberOfTouchesRequired: type == EGestureType::LongPress1 ? 1 : 2];
+      break;
+    }
+//    case EGestureType::SwipeLeft:
+//    {
+//      gestureRecognizer = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(onSwipeGesture:)];
+//      [(UISwipeGestureRecognizer*) gestureRecognizer setDirection:UISwipeGestureRecognizerDirectionLeft];
+//      break;
+//    }
+//    case EGestureType::SwipeRight:
+//    {
+//      gestureRecognizer = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(onSwipeGesture:)];
+//      [(UISwipeGestureRecognizer*) gestureRecognizer setDirection:UISwipeGestureRecognizerDirectionRight];
+//      break;
+//    }
+//    case EGestureType::SwipeUp:
+//    {
+//      gestureRecognizer = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(onSwipeGesture:)];
+//      [(UISwipeGestureRecognizer*) gestureRecognizer setDirection:UISwipeGestureRecognizerDirectionUp];
+//      break;
+//    }
+//    case EGestureType::SwipeDown:
+//    {
+//      gestureRecognizer = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(onSwipeGesture:)];
+//      [(UISwipeGestureRecognizer*) gestureRecognizer setDirection:UISwipeGestureRecognizerDirectionDown];
+//      break;
+//    }
+    case EGestureType::Pan:
+    {
+      gestureRecognizer = [[NSPanGestureRecognizer alloc] initWithTarget:self action:@selector(onPanGesture:)];
+      break;
+    }
+    case EGestureType::Pinch:
+    {
+      gestureRecognizer = [[NSMagnificationGestureRecognizer alloc] initWithTarget:self action:@selector(onMagnificationGesture:)];
+      break;
+    }
+    case EGestureType::Rotate:
+    {
+      gestureRecognizer = [[NSRotationGestureRecognizer alloc] initWithTarget:self action:@selector(onRotateGesture:)];
+      break;
+    }
+    default:
+      return;
+  }
+  
+ // gestureRecognizer.delegate = self;
+//  gestureRecognizer.delaysPrimaryMouseButtonEvents = YES;
+  [self addGestureRecognizer:gestureRecognizer];
+}
+
+- (void) onClickGesture: (NSClickGestureRecognizer*) recognizer
+{
+  CGPoint p = [recognizer locationInView:self];
+  auto ds = mGraphics->GetDrawScale();
+  IGestureInfo info;
+  info.x = p.x / ds;
+  info.y = p.y / ds;
+  info.type = recognizer.numberOfClicksRequired == 2 ? EGestureType::DoubleTap : EGestureType::TripleTap;
+  
+  mGraphics->OnGestureRecognized(info);
+}
+
+- (void) onPressGesture: (NSPressGestureRecognizer*) recognizer
+{
+  CGPoint p = [recognizer locationInView:self];
+  auto ds = mGraphics->GetDrawScale();
+  IGestureInfo info;
+  info.x = p.x / ds;
+  info.y = p.y / ds;
+  if(recognizer.state == NSGestureRecognizerStateBegan)
+    info.state = EGestureState::Began;
+  else if(recognizer.state == NSGestureRecognizerStateChanged)
+    info.state = EGestureState::InProcess;
+  else if(recognizer.state == NSGestureRecognizerStateEnded)
+    info.state = EGestureState::Ended;
+  
+  //info.type = recognizer.numberOfTouchesRequired == 1 ? EGestureType::LongPress1 : EGestureType::LongPress2;
+  
+  mGraphics->OnGestureRecognized(info);
+}
+
+- (void) onPanGesture: (NSPanGestureRecognizer*) recognizer
+{
+  CGPoint p = [recognizer locationInView:self];
+  auto ds = mGraphics->GetDrawScale();
+  IGestureInfo info;
+  info.x = p.x / ds;
+  info.y = p.y / ds;
+/*
+  switch (recognizer.direction) {
+    case UISwipeGestureRecognizerDirectionLeft: info.type = EGestureType::SwipeLeft; break;
+    case UISwipeGestureRecognizerDirectionRight: info.type = EGestureType::SwipeRight; break;
+    case UISwipeGestureRecognizerDirectionUp: info.type = EGestureType::SwipeUp; break;
+    case UISwipeGestureRecognizerDirectionDown: info.type = EGestureType::SwipeDown; break;
+    default:
+      break;
+  }
+  */
+  
+  mGraphics->OnGestureRecognized(info);
+}
+
+- (void) onMagnificationGesture: (NSMagnificationGestureRecognizer*) recognizer
+{
+  CGPoint p = [recognizer locationInView:self];
+  auto ds = mGraphics->GetDrawScale();
+  IGestureInfo info;
+  info.x = p.x / ds;
+  info.y = p.y / ds;
+  info.scale = recognizer.magnification;
+  
+  if(recognizer.state == NSGestureRecognizerStateBegan)
+    info.state = EGestureState::Began;
+  else if(recognizer.state == NSGestureRecognizerStateChanged)
+    info.state = EGestureState::InProcess;
+  else if(recognizer.state == NSGestureRecognizerStateEnded)
+    info.state = EGestureState::Ended;
+  
+  info.type = EGestureType::Pinch;
+  
+  mGraphics->OnGestureRecognized(info);
+}
+
+- (void) onRotateGesture: (NSRotationGestureRecognizer*) recognizer
+{
+  CGPoint p = [recognizer locationInView:self];
+  auto ds = mGraphics->GetDrawScale();
+  IGestureInfo info;
+  info.x = p.x / ds;
+  info.y = p.y / ds;
+  info.angle = RadToDeg(recognizer.rotation);
+  
+  if(recognizer.state == NSGestureRecognizerStateBegan)
+    info.state = EGestureState::Began;
+  else if(recognizer.state == NSGestureRecognizerStateChanged)
+    info.state = EGestureState::InProcess;
+  else if(recognizer.state == NSGestureRecognizerStateEnded)
+    info.state = EGestureState::Ended;
+  
+  info.type = EGestureType::Rotate;
+
+  mGraphics->OnGestureRecognized(info);
+}
+
+-(BOOL) gestureRecognizer:(NSGestureRecognizer*) gestureRecognizer shouldReceiveTouch:(NSTouch*) touch
+{
+  CGPoint pos = [touch locationInView:self];
+  
+  auto ds = mGraphics->GetDrawScale();
+
+  if(mGraphics->RespondsToGesture(pos.x / ds, pos.y / ds))
+    return TRUE;
+  else
+    return FALSE;
+}
 
 //- (void)windowResized: (NSNotification *) notification;
 //{

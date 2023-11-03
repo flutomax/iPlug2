@@ -791,7 +791,7 @@ public:
    * @param caption The title of the message box window \todo check
    * @param type EMsgBoxType describing the button options available \see EMsgBoxType
    * @return \todo check */
-  virtual EMsgBoxResult ShowMessageBox(const char* str, const char* caption, EMsgBoxType type, IMsgBoxCompletionHanderFunc completionHandler = nullptr) = 0;
+  virtual EMsgBoxResult ShowMessageBox(const char* str, const char* caption, EMsgBoxType type, EMsgBoxIcon icon, IMsgBoxCompletionHanderFunc completionHandler = nullptr) = 0;
 
   /** Create a platform file prompt dialog to choose a file/directory path for opening/saving a file/directory. NOTE: this method will block the main thread
    * @param fileName Non const WDL_String reference specifying the file name. Set this prior to calling the method for save dialogs, to provide a default file name. For load dialogs, on successful selection of a file this will get set to the file’s name.
@@ -868,6 +868,10 @@ public:
 
   /** Get the bundle ID on macOS and iOS, returns emtpy string on other OSs */
   virtual const char* GetBundleID() { return ""; }
+
+  virtual void SetEditText(IText text) {}
+  virtual bool IsEditVisible() { return false; }
+  virtual const IParam* GetEditParam() { return nullptr; }
 
 protected:
   /* Implemented on Windows to store previously active GLContext and HDC for restoring, calls GetDC */
@@ -979,8 +983,10 @@ public:
   /** \todo detailed description of how this works
    * @param w New width in pixels
    * @param h New height in pixels
-   * @param scale New scale ratio */
-  void Resize(int w, int h, float scale);
+   * @param scale New scale ratio
+   * @param needsPlatformResize This should be true for a "manual" resize from the plug-in UI and false
+   * if being called from IEditorDelegate::OnParentWindowResize(), in order to avoid feedback */
+  void Resize(int w, int h, float scale, bool needsPlatformResize = true);
   
   /** Enables strict drawing mode. \todo explain strict drawing
    * @param strict Set /true to enable strict drawing mode */
@@ -1209,6 +1215,10 @@ public:
   /** Attach an IPanelControl as the lowest IControl in the control stack to fill the background with a solid color
    * @param color The color to fill the panel with */
   void AttachPanelBackground(const IPattern& color);
+
+  /** Attach any conrtol as the lowest IControl in the control stack to fill the background with a solid color
+   * @param pBG - pointer to control */
+  void AttachBackgroundControl(IControl* pBG);
   
   /** Attach the default control to scale or increase the UI size by dragging the plug-in bottom right-hand corner
    * @param sizeMode Choose whether to scale or size the UI */
@@ -1297,7 +1307,10 @@ public:
   /** @return The number of controls that have been added to this graphics context */
   int NControls() const { return mControls.GetSize(); }
 
-  /** Remove control from the control list */
+  /** Remove a control at a particular index, (frees memory). */
+  void RemoveControl(int idx);
+
+  /** Remove a control at using ptr, (frees memory). */
   void RemoveControl(IControl* pControl);
   
   /** Remove controls from the control list with a particular tag.  */
@@ -1399,6 +1412,10 @@ public:
 
   /** \todo */
   void OnGUIIdle();
+
+  /** \todo */
+  void OnLostFocus();
+
   
   /** Called by ICornerResizerControl as the corner is dragged to resize */
   void OnDragResize(float x, float y);

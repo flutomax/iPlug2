@@ -80,14 +80,19 @@ IGraphics::~IGraphics()
 void IGraphics::SetScreenScale(int scale)
 {
   mScreenScale = scale;
-  PlatformResize(GetDelegate()->EditorResizeFromUI(WindowWidth() * GetPlatformWindowScale(), WindowHeight() * GetPlatformWindowScale()));
+  int windowWidth = WindowWidth() * GetPlatformWindowScale();
+  int windowHeight = WindowHeight() * GetPlatformWindowScale();
+
+  PlatformResize(GetDelegate()->EditorResizeFromUI(windowWidth, windowHeight, true));
   ForAllControls(&IControl::OnRescale);
   SetAllControlsDirty();
   DrawResize();
 }
 
-void IGraphics::Resize(int w, int h, float scale)
+void IGraphics::Resize(int w, int h, float scale, bool needsPlatformResize)
 {
+  GetDelegate()->ConstrainEditorResize(w, h);
+ 
   w = Clip(w, mMinWidth, mMaxWidth);
   h = Clip(h, mMinHeight, mMaxHeight);
   scale = Clip(scale, mMinScale, mMaxScale);
@@ -104,7 +109,11 @@ void IGraphics::Resize(int w, int h, float scale)
   if (mCornerResizer)
     mCornerResizer->OnRescale();
 
-  PlatformResize(GetDelegate()->EditorResizeFromUI(WindowWidth() * GetPlatformWindowScale(), WindowHeight() * GetPlatformWindowScale()));
+  int windowWidth = WindowWidth() * GetPlatformWindowScale();
+  int windowHeight = WindowHeight() * GetPlatformWindowScale();
+
+  PlatformResize(GetDelegate()->EditorResizeFromUI(windowWidth, windowHeight, needsPlatformResize));
+
   ForAllControls(&IControl::OnResize);
   SetAllControlsDirty();
   DrawResize();
@@ -146,6 +155,30 @@ void IGraphics::RemoveControls(int fromIdx)
     mControls.Delete(idx--, true);
   }
   
+  SetAllControlsDirty();
+}
+
+void IGraphics::RemoveControl(int idx)
+{
+  RemoveControl(GetControl(idx));
+}
+
+void IGraphics::RemoveControl(IControl* pControl)
+{
+  if (ControlIsCaptured(pControl))
+    ReleaseMouseCapture();
+
+  if (pControl == mMouseOver)
+    ClearMouseOver();
+
+  if (pControl == mInTextEntry)
+    mInTextEntry = nullptr;
+
+  if (pControl == mInPopupMenu)
+    mInPopupMenu = nullptr;
+
+  mControls.DeletePtr(pControl, true);
+
   SetAllControlsDirty();
 }
 
@@ -217,6 +250,12 @@ void IGraphics::AttachSVGBackground(const char* fileName)
 void IGraphics::AttachPanelBackground(const IPattern& color)
 {
   IControl* pBG = new IPanelControl(GetBounds(), color);
+  pBG->SetDelegate(*GetDelegate());
+  mControls.Insert(0, pBG);
+}
+
+void IGraphics::AttachBackgroundControl(IControl* pBG)
+{
   pBG->SetDelegate(*GetDelegate());
   mControls.Insert(0, pBG);
 }
@@ -508,7 +547,7 @@ void IGraphics::PromptUserInput(IControl& control, const IRECT& bounds, int valI
         const char* str = pParam->GetDisplayText(i);
         // TODO: what if two parameters have the same text?
         if (!strcmp(str, currentText.Get())) // strings are equal
-          mPromptPopupMenu.AddItem( new IPopupMenu::Item(str, IPopupMenu::Item::kChecked), -1 );
+          mPromptPopupMenu.AddItem( new IPopupMenu::Item(str, IPopupMenu::Item::kRadio), -1 );
         else // not equal
           mPromptPopupMenu.AddItem( new IPopupMenu::Item(str), -1 );
         
@@ -877,10 +916,15 @@ void IGraphics::OnMouseDown(const std::vector<IMouseInfo>& points)
     IControl* pCapturedControl = GetMouseControl(x, y, true, false, mod.touchID);
     
     if (pCapturedControl)
-    {
-      
-      int nVals = pCapturedControl->NVals();
+    {           
       int valIdx = pCapturedControl->GetValIdxForPos(x, y);
+      if (mod.R && valIdx == kNoValIdx)
+      {
+        // Z: force call for control popup menu 
+        pCapturedControl->OnMouseDown(x, y, mod);
+        return;
+      }
+      int nVals = pCapturedControl->NVals();
       int paramIdx = pCapturedControl->GetParamIdx((valIdx > kNoValIdx) ? valIdx : 0);
 
 #ifdef AAX_API
@@ -932,7 +976,10 @@ void IGraphics::OnMouseDown(const std::vector<IMouseInfo>& points)
       for (int v = 0; v < nVals; v++)
       {
         if (pCapturedControl->GetParamIdx(v) > kNoParameter)
-          GetDelegate()->BeginInformHostOfParamChangeFromUI(pCapturedControl->GetParamIdx(v));
+        {
+          if (!pCapturedControl->GetParam(v)->GetHidden())
+            GetDelegate()->BeginInformHostOfParamChangeFromUI(pCapturedControl->GetParamIdx(v));
+        }
       }
 
       pCapturedControl->OnMouseDown(x, y, mod);
@@ -964,7 +1011,10 @@ void IGraphics::OnMouseUp(const std::vector<IMouseInfo>& points)
         for (int v = 0; v < nVals; v++)
         {
           if (pCapturedControl->GetParamIdx(v) > kNoParameter)
-            GetDelegate()->EndInformHostOfParamChangeFromUI(pCapturedControl->GetParamIdx(v));
+          {
+            if (!pCapturedControl->GetParam(v)->GetHidden())
+              GetDelegate()->EndInformHostOfParamChangeFromUI(pCapturedControl->GetParamIdx(v));
+          }
         }
         
         mCapturedMap.erase(itr);
@@ -1197,7 +1247,7 @@ bool IGraphics::OnKeyUp(float x, float y, const IKeyPress& key)
 void IGraphics::OnDrop(const char* str, float x, float y)
 {
   IControl* pControl = GetMouseControl(x, y, false);
-  if (pControl) pControl->OnDrop(str);
+  if (pControl) pControl->OnDrop(str, x, y);
 }
 
 void IGraphics::ReleaseMouseCapture()
@@ -1389,6 +1439,15 @@ void IGraphics::OnGUIIdle()
   ForAllControls(&IControl::OnGUIIdle);
 }
 
+
+void IGraphics::OnLostFocus()
+{
+  TRACE
+
+  ForAllControls(&IControl::OnLostFocus);
+}
+
+
 void IGraphics::OnDragResize(float x, float y)
 {
   if(mGUISizeMode == EUIResizerMode::Scale)
@@ -1575,6 +1634,7 @@ ISVG IGraphics::LoadSVG(const char* fileName, const char* units, float dpi)
   return ISVG(pHolder->mImage);
 }
 #endif
+
 
 IBitmap IGraphics::LoadBitmap(const char* name, int nStates, bool framesAreHorizontal, int targetScale)
 {

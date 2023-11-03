@@ -32,7 +32,7 @@ class IParam
 public:
 
   /** Defines types or parameter. */
-  enum EParamType { kTypeNone, kTypeBool, kTypeInt, kTypeEnum, kTypeDouble };
+  enum EParamType { kTypeNone, kTypeBool, kTypeInt, kTypeEnum, kTypeDouble, kTypeNote };
 
   /** Used by AudioUnit plugins to determine the appearance of parameters, based on the kind of data they represent */
   enum EParamUnit { kUnitPercentage, kUnitSeconds, kUnitMilliseconds, kUnitSamples, kUnitDB, kUnitLinearGain, kUnitPan, kUnitPhase, kUnitDegrees, kUnitMeters, kUnitRate, kUnitRatio, kUnitFrequency, kUnitOctaves, kUnitCents, kUnitAbsCents, kUnitSemitones, kUnitMIDINote, kUnitMIDICtrlNum, kUnitBPM, kUnitBeats, kUnitCustom };
@@ -43,12 +43,15 @@ public:
   /** Flags to determine characteristics of the parameter */
   enum EFlags
   {
-    kFlagsNone            = 0,
-    kFlagCannotAutomate   = 0x1, /** Indicates that the parameter is not automatable */
-    kFlagStepped          = 0x2, /** Indicates that the parameter ???  */
-    kFlagNegateDisplay    = 0x4, /** Indicates that the parameter should be displayed as a negative value */
-    kFlagSignDisplay      = 0x8, /** Indicates that the parameter should be displayed as a signed value */
-    kFlagMeta             = 0x10, /** Indicates that the parameter may influence the state of other parameters */
+    kFlagsNone = 0,
+    kFlagCannotAutomate = 0x1, /** Indicates that the parameter is not automatable */
+    kFlagStepped = 0x2, /** Indicates that the parameter ???  */
+    kFlagNegateDisplay = 0x4, /** Indicates that the parameter should be displayed as a negative value */
+    kFlagSignDisplay = 0x8, /** Indicates that the parameter should be displayed as a signed value */
+    kFlagMinusInfDisplay = 0x10, /** Indicates that the parameter should be displayed as a -inf on min value */
+    kFlagForceRound = 0x20, /** Indicates that the parameter should be displayed as a rounded value */
+    kFlagMeta = 0x40, /** Indicates that the parameter may influence the state of other parameters */
+    kFlagHidden = 0x80 /** Hidden parametr */
   };
   
   using DisplayFunc = std::function<void(double, WDL_String&)>;
@@ -158,6 +161,8 @@ public:
    * @param group /todo*/
   void InitEnum(const char* name, int defaultValue, const std::initializer_list<const char*>& listItems, int flags = 0, const char* group = "");
 
+  void InitNote(const char* name, int defaultValue, int nEnums, const char* label = "", int flags = 0, const char* group = "", const char* listItems = 0, ...);
+
   /** /todo 
    * @param name /todo
    * @param defaultValue /todo
@@ -229,6 +234,8 @@ public:
    * @param flags /todo
    * @param group /todo */
   void InitGain(const char* name, double defaultVal = 0., double minVal = -70., double maxVal = 24., double step = 0.5, int flags = 0, const char* group = "");
+
+  void InitDB(const char* name, double defaultVal = 0., double minVal = -80., double maxVal = 6., double step = 0.5, int flags = 0, const char* group = "");
   
   /** /todo 
    * @param name /todo
@@ -238,6 +245,8 @@ public:
    * @param flags /todo
    * @param group /todo */
   void InitPercentage(const char* name, double defaultVal = 0., double minVal = 0., double maxVal = 100., int flags = 0, const char* group = "");
+
+  void InitPan(const char* name, double defaultVal = 0., double minVal = -100., double maxVal = 100., int flags = 0, const char* group = "");
 
   /** /todo 
    * @param name /todo
@@ -259,6 +268,14 @@ public:
    * @param str /todo
    * @return double /todo */
   double StringToValue(const char* str) const;
+
+  /** Constrains a normalised input value similarly to Constrain()
+   * @param value The normalised input value to constrain
+   * @return double The resulting constrained value */
+  inline double ConstrainNormalized(double normalizedValue) const
+  {
+    return ToNormalized(mShape->NormalizedToValue(normalizedValue, *this));
+  }
 
   /** Constrains the input value between \c mMin and \c mMax
    * @param value The input value to constrain
@@ -337,6 +354,23 @@ public:
    * @param withDisplayText /todo */
   void GetDisplayForHost(WDL_String& display, bool withDisplayText = true) const { GetDisplayForHost(mValue.load(), false, display, withDisplayText); }
 
+  /** /todo
+   * @param display /todo
+   * @param withDisplayText /todo */
+  void GetDisplay(WDL_String& display, bool withDisplayText = true) const { GetDisplayForHost(mValue.load(), false, display, withDisplayText, true); }
+
+  void GetDisplayWithLabel(WDL_String& display, bool withDisplayText = true) const
+  {
+    GetDisplayForHost(mValue.load(), false, display, withDisplayText);
+    const char* hostlabel = GetLabelForHost();
+    if (CStringHasContents(hostlabel))
+    {
+      display.Append(" ");
+      display.Append(hostlabel);
+    }
+  }
+
+
   void GetDisplayForHostWithLabel(WDL_String& display, bool withDisplayText = true) const
   {
     GetDisplayForHost(mValue.load(), false, display, withDisplayText);
@@ -349,7 +383,7 @@ public:
    * @param normalized /todo
    * @param display /todo
    * @param withDisplayText /todo */
-  void GetDisplayForHost(double value, bool normalized, WDL_String& display, bool withDisplayText = true) const;
+  void GetDisplayForHost(double value, bool normalized, WDL_String& display, bool withDisplayText = true, bool valueonly = false) const;
 
   /** /todo 
    * @return const char* /todo */
@@ -435,7 +469,7 @@ public:
 
   /** /todo 
    * @return true /todo  */
-  bool GetCanAutomate() const { return !(mFlags & kFlagCannotAutomate); }
+  bool GetCanAutomate() const { return !((mFlags & kFlagCannotAutomate) || (mFlags & kFlagHidden)); }
 
   /** /todo 
    * @return true /todo */
@@ -452,6 +486,10 @@ public:
   /** /todo 
    * @return false /todo */
   bool GetMeta() const { return mFlags & kFlagMeta; }
+  
+  /** /ZEF
+   * @return false /todo */
+  bool GetHidden() const { return mFlags & kFlagHidden; }
  
   /** /todo 
    * @param json /todo
@@ -460,6 +498,9 @@ public:
 
   /** /todo */
   void PrintDetails() const;
+
+  void Inc();
+  void Dec();
 private:
   /** /todo */
   struct DisplayText

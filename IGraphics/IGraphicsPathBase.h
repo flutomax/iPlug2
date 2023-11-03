@@ -139,10 +139,10 @@ public:
     PathStroke(color, thickness, IStrokeOptions(), pBlend);
   }
   
-  void DrawRoundRect(const IColor& color, const IRECT& bounds, float cRTL, float cRTR, float cRBR, float cRBL, const IBlend* pBlend, float thickness) override
+  void DrawRoundRect(const IColor& color, const IRECT& bounds, float cRTL, float cRTR, float cRBL, float cRBR, const IBlend* pBlend, float thickness) override
   {
     PathClear();
-    PathRoundRect(bounds, cRTL, cRTR, cRBR, cRBL);
+    PathRoundRect(bounds, cRTL, cRTR, cRBL, cRBR);
     PathStroke(color, thickness, IStrokeOptions(), pBlend);
   }
   

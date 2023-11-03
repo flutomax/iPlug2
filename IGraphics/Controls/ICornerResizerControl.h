@@ -35,10 +35,23 @@ public:
 
   void Draw(IGraphics& g) override
   {
+    /* ZEF -> Old drawing
     if(GetMouseIsOver() || GetUI()->mResizingInProcess)
       g.FillTriangle(COLOR_BLACK, mRECT.L, mRECT.B, mRECT.R, mRECT.T, mRECT.R, mRECT.B);
     else
       g.FillTriangle(COLOR_TRANSLUCENT, mRECT.L, mRECT.B, mRECT.R, mRECT.T, mRECT.R, mRECT.B);
+    */
+    g.FillTriangle(COLOR_TRANSLUCENT, mRECT.L, mRECT.B, mRECT.R, mRECT.T, mRECT.R, mRECT.B);
+    const float k = 1.f / GetUI()->GetDrawScale();
+    const float delta = 5.f * k;
+    IRECT r = mRECT.GetPadded(0.f, 0.f, -2.f * k, -2.f * k);
+    IColor clr = (GetMouseIsOver() || GetUI()->mResizingInProcess) ? COLOR_DARK_GRAY : COLOR_TRANSLUCENT;
+    for (int i = 0; i < 3; ++i)
+    {
+      r.L += delta;
+      r.T += delta;
+      g.DrawLine(clr, r.L, r.B, r.R, r.T);
+    }
   }
 
   void OnMouseDown(float x, float y, const IMouseMod& mod) override

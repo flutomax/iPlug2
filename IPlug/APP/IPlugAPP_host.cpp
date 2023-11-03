@@ -85,9 +85,18 @@ void IPlugAPPHost::CloseWindow()
 bool IPlugAPPHost::InitState()
 {
 #if defined OS_WIN
+  /* // old
   TCHAR strPath[MAX_PATH_LEN];
-  SHGetFolderPathA( NULL, CSIDL_LOCAL_APPDATA, NULL, 0, strPath );
+  SHGetFolderPathA(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, strPath);
   mINIPath.SetFormatted(MAX_PATH_LEN, "%s\\%s\\", strPath, BUNDLE_NAME);
+  */
+  HMODULE module = NULL;
+  GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, (LPCTSTR) & __FUNCTION__, &module);
+  TCHAR path[MAX_PATH_LEN];
+  GetModuleFileNameA(module, path, MAX_PATH_LEN);
+  mINIPath.Set(path);
+  mINIPath.remove_fileext();
+  mINIPath.Append(".ini");
 #elif defined OS_MAC
   mINIPath.SetFormatted(MAX_PATH_LEN, "%s/Library/Application Support/%s/", getenv("HOME"), BUNDLE_NAME);
 #else
@@ -98,8 +107,9 @@ bool IPlugAPPHost::InitState()
 
   if(stat(mINIPath.Get(), &st) == 0) // if directory exists
   {
+#if defined OS_MAC
     mINIPath.Append("settings.ini"); // add file name to path
-
+#endif
     char buf[STRBUFSZ];
     
     if(stat(mINIPath.Get(), &st) == 0) // if settings file exists read values into state
@@ -136,9 +146,10 @@ bool IPlugAPPHost::InitState()
   {
 #if defined OS_WIN
     // folder doesn't exist - make folder and make file
-    CreateDirectory(mINIPath.Get(), NULL);
+  /*  old
+  CreateDirectory(mINIPath.Get(), NULL);
     mINIPath.Append("settings.ini");
-    UpdateINI(); // will write file if doesn't exist
+    UpdateINI(); // will write file if doesn't exist    */
 #elif defined OS_MAC
     mode_t process_mask = umask(0);
     int result_code = mkdir(mINIPath.Get(), S_IRWXU | S_IRWXG | S_IRWXO);

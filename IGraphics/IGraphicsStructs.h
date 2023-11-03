@@ -652,7 +652,9 @@ struct IText
         EVAlign valign = EVAlign::Middle,
         float angle = 0,
         const IColor& TEBGColor = DEFAULT_TEXTENTRY_BGCOLOR,
-        const IColor& TEFGColor = DEFAULT_TEXTENTRY_FGCOLOR)
+        const IColor& TEFGColor = DEFAULT_TEXTENTRY_FGCOLOR,
+        bool Aliasing = false
+    )
     : mSize(size)
     , mFGColor(color)
     , mAlign(align)
@@ -660,6 +662,7 @@ struct IText
     , mAngle(angle)
     , mTextEntryBGColor(TEBGColor)
     , mTextEntryFGColor(TEFGColor)
+    , mAliasing(Aliasing)
   {
     strcpy(mFont, (font ? font : DEFAULT_FONT));
   }
@@ -709,6 +712,7 @@ struct IText
   float mAngle = 0.f; // Degrees ccwise from normal.
   EAlign mAlign = EAlign::Near;
   EVAlign mVAlign = EVAlign::Middle;
+  bool mAliasing = false;
 };
 
 const IText DEFAULT_TEXT = IText();
@@ -1210,6 +1214,32 @@ struct IRECT
   {
     IRECT r = *this;
     r.PixelSnap(scale);
+    return r;
+  }
+
+  /** makes sure TopLeft is above and to the left of BottomRight
+   */
+  inline void Normalize()
+  {
+    float temp;
+    if (T > B)
+    {
+      temp = T;
+      T = B;
+      B = temp;
+    }
+    if (L > R)
+    {
+      temp = L;
+      L = R;
+      R = temp;
+    }
+  }
+
+  IRECT GetNormalized() const
+  {
+    IRECT r = *this;
+    r.Normalize();
     return r;
   }
   

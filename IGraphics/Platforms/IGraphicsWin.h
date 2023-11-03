@@ -16,6 +16,11 @@
 
 #include "IGraphics_select.h"
 
+// Custom cursors definition
+
+#define CURSOR_HANDCLOSED 1000
+#define CURSOR_HANDOPEN 1001
+
 BEGIN_IPLUG_NAMESPACE
 BEGIN_IGRAPHICS_NAMESPACE
 
@@ -40,6 +45,12 @@ public:
 
 #ifdef IGRAPHICS_GL
   void DrawResize() override; // overriden here to deal with GL graphics context capture
+  void CreateGLContext(); // OpenGL context management - TODO: RAII instead ?
+  void DestroyGLContext();
+#endif    
+#ifdef IGRAPHICS_VSYNC
+  void StartVBlankThread(HWND hWnd);
+  void StopVBlankThread();
 #endif
 
   void CheckTabletInput(UINT msg);
@@ -51,13 +62,13 @@ public:
   
   void GetMouseLocation(float& x, float&y) const override;
 
-  EMsgBoxResult ShowMessageBox(const char* str, const char* caption, EMsgBoxType type, IMsgBoxCompletionHanderFunc completionHandler) override;
+  EMsgBoxResult ShowMessageBox(const char* str, const char* caption, EMsgBoxType type, EMsgBoxIcon icon, IMsgBoxCompletionHanderFunc completionHandler) override;
 
   void* OpenWindow(void* pParent) override;
   void CloseWindow() override;
   bool WindowIsOpen() override { return (mPlugWnd); }
 
-  void UpdateTooltips() override {}
+  void UpdateTooltips() override { ShowTooltip(); }
 
   bool RevealPathInExplorerOrFinder(WDL_String& path, bool select) override;
   void PromptForFile(WDL_String& fileName, WDL_String& path, EFileAction action, const char* ext) override;
@@ -84,12 +95,16 @@ public:
 
   bool PlatformSupportsMultiTouch() const override;
 
+  void SetEditText(IText text) override;
+  bool IsEditVisible() override { return (mParamEditWnd != nullptr); };
+  const IParam* GetEditParam() override { return mEditParam; };
   
   static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
   static LRESULT CALLBACK ParamEditProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
   static BOOL CALLBACK FindMainWindow(HWND hWnd, LPARAM lParam);
 
   DWORD OnVBlankRun();
+
 
 protected:
   IPopupMenu* CreatePlatformPopupMenu(IPopupMenu& menu, const IRECT& bounds, bool& isAsync) override;
@@ -123,8 +138,6 @@ private:
   bool MouseCursorIsLocked();
 
 #ifdef IGRAPHICS_GL
-  void CreateGLContext(); // OpenGL context management - TODO: RAII instead ?
-  void DestroyGLContext();
   void ActivateGLContext() override;
   void DeactivateGLContext() override;
   HGLRC mHGLRC = nullptr;
@@ -143,8 +156,6 @@ private:
   DWORD mPID = 0;
 
 #ifdef IGRAPHICS_VSYNC
-  void StartVBlankThread(HWND hWnd);
-  void StopVBlankThread();
   void VBlankNotify();
   HWND mVBlankWindow = 0; // Window to post messages to for every vsync
   bool mVBlankShutdown = false; // Flag to indiciate that the vsync thread should shutdown

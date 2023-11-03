@@ -128,7 +128,7 @@ public:
    *  @param denominator The lower part of the current time signature e.g "8" in the time signature 6/8 */
   void GetTimeSig(int& numerator, int& denominator) const { numerator = mTimeInfo.mNumerator; denominator = mTimeInfo.mDenominator; }
 
-#pragma mark -
+#pragma mark -  z
   /** @return The number of channel I/O configs derived from the channel io string*/
   int NIOConfigs() const { return mIOConfigs.GetSize(); }
 

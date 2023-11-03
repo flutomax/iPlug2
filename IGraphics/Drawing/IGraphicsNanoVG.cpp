@@ -424,7 +424,7 @@ void IGraphicsNanoVG::OnViewInitialized(void* pContext)
 #if defined IGRAPHICS_METAL
   mVG = nvgCreateContext(pContext, NVG_ANTIALIAS | NVG_TRIPLE_BUFFER); //TODO: NVG_STENCIL_STROKES currently has issues
 #else
-  mVG = nvgCreateContext(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
+  mVG = nvgCreateContext(NVG_ANTIALIAS /*| NVG_STENCIL_STROKES*/);
 #endif
 
   if (mVG == nullptr)
@@ -599,6 +599,7 @@ void IGraphicsNanoVG::PrepareAndMeasureText(const IText& text, const char* str, 
   assert(nvgFindFont(mVG, text.mFont) != -1 && "No font found - did you forget to load it?");
   
   nvgFontBlur(mVG, 0);
+
   nvgFontSize(mVG, text.mSize);
   nvgFontFace(mVG, text.mFont);
   

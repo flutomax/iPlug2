@@ -62,6 +62,7 @@ static inline bool CStringHasContents(const char* str) { return str && str[0] !=
   switch (paramType) { \
     case IParam::kTypeBool: \
     case IParam::kTypeInt: \
+    case IParam::kTypeNote: \
     case IParam::kTypeEnum: { \
       v = (double) va_arg(vp, int); \
       break; \
@@ -199,7 +200,7 @@ static EHost LookUpHost(const char* inHost)
   if (strstr(host, "vst3plugintesthost"))   return kHostVST3TestHost;
   if (strstr(host, "ardour"))               return kHostArdour;
   if (strstr(host, "renoise"))              return kHostRenoise;
-  if (strstr(host, "OpenMPT"))              return kHostOpenMPT;
+  if (strstr(host, "openmpt"))              return kHostOpenMPT;
   if (strstr(host, "wavelab elements"))     return kHostWaveLabElements; // check for wavelab elements should come before wavelab ...
   if (strstr(host, "wavelab"))              return kHostWaveLab;
   if (strstr(host, "twistedwave"))          return kHostTwistedWave;
@@ -213,7 +214,8 @@ static EHost LookUpHost(const char* inHost)
   if (strstr(host, "izotope rx"))           return kHostiZotopeRX;
   if (strstr(host, "savihost"))             return kHostSAVIHost;
   if (strstr(host, "blue cat's vst host"))  return kHostBlueCat;
-  
+  if (strstr(host, "mixbus"))               return kHostMixbus32C;
+
   if (strstr(host, "standalone"))           return kHostStandalone;
   if (strstr(host, "www"))                  return kHostWWW;
 
@@ -233,53 +235,54 @@ static void GetHostNameStr(EHost host, WDL_String& str)
 {
   switch (host)
   {
-      case kHostReaper:             str.Set("reaper");              break;
-      case kHostProTools:           str.Set("protools");            break;
-      case kHostCubase:             str.Set("cubase");              break;
-      case kHostNuendo:             str.Set("nuendo");              break;
-      case kHostSonar:              str.Set("cakewalk");            break;
-      case kHostVegas:              str.Set("vegas");               break;
-      case kHostFL:                 str.Set("fruity");              break;
-      case kHostSamplitude:         str.Set("samplitude");          break;
-      case kHostAbletonLive:        str.Set("live");                break;
-      case kHostTracktion:          str.Set("tracktion");           break;
-      case kHostNTracks:            str.Set("ntracks");             break;
-      case kHostMelodyneStudio:     str.Set("melodyne");            break;
-      case kHostVSTScanner:         str.Set("vstmanlib");           break;
-      case kHostAULab:              str.Set("aulab");               break;
-      case kHostForte:              str.Set("forte");               break;
-      case kHostChainer:            str.Set("chainer");             break;
-      case kHostAudition:           str.Set("audition");            break;
-      case kHostOrion:              str.Set("orion");               break;
-      case kHostBias:               str.Set("bias");                break;
-      case kHostSAWStudio:          str.Set("sawstudio");           break;
-      case kHostLogic:              str.Set("logic");               break;
-      case kHostGarageBand:         str.Set("garageband");          break;
-      case kHostDigitalPerformer:   str.Set("digital");             break;
-      case kHostAudioMulch:         str.Set("audiomulch");          break;
-      case kHostStudioOne:          str.Set("presonus");            break;
-      case kHostVST3TestHost:       str.Set("vst3plugintesthost");  break;
-      case kHostArdour:             str.Set("ardour");              break;
-      case kHostRenoise:            str.Set("renoise");             break;
-      case kHostOpenMPT:            str.Set("OpenMPT");             break;
-      case kHostWaveLabElements:    str.Set("wavelab elements");    break;
-      case kHostWaveLab:            str.Set("wavelab");             break;
-      case kHostTwistedWave:        str.Set("twistedwave");         break;
-      case kHostBitwig:             str.Set("bitwig studio");       break;
-      case kHostReason:             str.Set("reason");              break;
-      case kHostGoldWave5x:         str.Set("gwvst");               break;
-      case kHostWaveform:           str.Set("waveform");            break;
-      case kHostAudacity:           str.Set("audacity");            break;
-      case kHostAcoustica:          str.Set("acoustica");           break;
-      case kHostPluginDoctor:       str.Set("plugindoctor");        break;
-      case kHostiZotopeRX:          str.Set("izotope rx");          break;
-      case kHostSAVIHost:           str.Set("savihost");            break;
-      case kHostBlueCat:            str.Set("blue cat's vst host"); break;
-      
-      case kHostStandalone:         str.Set("standalone");          break;
-      case kHostWWW:                str.Set("www");                 break;
+  case kHostReaper:             str.Set("reaper");              break;
+  case kHostProTools:           str.Set("protools");            break;
+  case kHostCubase:             str.Set("cubase");              break;
+  case kHostNuendo:             str.Set("nuendo");              break;
+  case kHostSonar:              str.Set("cakewalk");            break;
+  case kHostVegas:              str.Set("vegas");               break;
+  case kHostFL:                 str.Set("fruity");              break;
+  case kHostSamplitude:         str.Set("samplitude");          break;
+  case kHostAbletonLive:        str.Set("live");                break;
+  case kHostTracktion:          str.Set("tracktion");           break;
+  case kHostNTracks:            str.Set("ntracks");             break;
+  case kHostMelodyneStudio:     str.Set("melodyne");            break;
+  case kHostVSTScanner:         str.Set("vstmanlib");           break;
+  case kHostAULab:              str.Set("aulab");               break;
+  case kHostForte:              str.Set("forte");               break;
+  case kHostChainer:            str.Set("chainer");             break;
+  case kHostAudition:           str.Set("audition");            break;
+  case kHostOrion:              str.Set("orion");               break;
+  case kHostBias:               str.Set("bias");                break;
+  case kHostSAWStudio:          str.Set("sawstudio");           break;
+  case kHostLogic:              str.Set("logic");               break;
+  case kHostGarageBand:         str.Set("garageband");          break;
+  case kHostDigitalPerformer:   str.Set("digital");             break;
+  case kHostAudioMulch:         str.Set("audiomulch");          break;
+  case kHostStudioOne:          str.Set("presonus");            break;
+  case kHostVST3TestHost:       str.Set("vst3plugintesthost");  break;
+  case kHostArdour:             str.Set("ardour");              break;
+  case kHostRenoise:            str.Set("renoise");             break;
+  case kHostOpenMPT:            str.Set("OpenMPT");             break;
+  case kHostWaveLabElements:    str.Set("wavelab elements");    break;
+  case kHostWaveLab:            str.Set("wavelab");             break;
+  case kHostTwistedWave:        str.Set("twistedwave");         break;
+  case kHostBitwig:             str.Set("bitwig studio");       break;
+  case kHostReason:             str.Set("reason");              break;
+  case kHostGoldWave5x:         str.Set("gwvst");               break;
+  case kHostWaveform:           str.Set("waveform");            break;
+  case kHostAudacity:           str.Set("audacity");            break;
+  case kHostAcoustica:          str.Set("acoustica");           break;
+  case kHostPluginDoctor:       str.Set("plugindoctor");        break;
+  case kHostiZotopeRX:          str.Set("izotope rx");          break;
+  case kHostSAVIHost:           str.Set("savihost");            break;
+  case kHostBlueCat:            str.Set("blue cat's vst host"); break;
+  case kHostMixbus32C:          str.Set("mixbus");              break;
 
-      default:                      str.Set("Unknown"); break;
+  case kHostStandalone:         str.Set("standalone");          break;
+  case kHostWWW:                str.Set("www");                 break;
+
+  default:                      str.Set("Unknown"); break;
   }
 }
 

@@ -480,6 +480,11 @@ APIBitmap* IGraphicsAGG::LoadAPIBitmap(const char* fileNameOrResID, int scale, E
   return new APIBitmap();
 }
 
+APIBitmap* IGraphicsAGG::LoadAPIBitmapFromMemory(const void* pData, int size, int scale)
+{
+	return nullptr;
+}
+
 APIBitmap* IGraphicsAGG::CreateAPIBitmap(int width, int height, int scale, double drawScale)
 {
   return new Bitmap(CreatePixmap<PixelMapType>(width, height), scale, drawScale, true);

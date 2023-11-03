@@ -121,6 +121,7 @@ struct IMidiMsg
     kUndefined117 = 117,
     kUndefined118 = 118,
     kUndefined119 = 119,
+    kAllSoundOff = 120,
     kAllNotesOff = 123
   };
   
@@ -492,7 +493,7 @@ struct IMidiMsg
       "Contr. 117",
       "Contr. 118",
       "Contr. 119",
-      "Contr. 120",
+      "AllSoundOff",
       "Reset Ctrl",
       "Local Ctrl",
       "AllNoteOff",

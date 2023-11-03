@@ -130,6 +130,24 @@ void IParam::InitEnum(const char* name, int defaultVal, const std::initializer_l
   }
 }
 
+void IParam::InitNote(const char* name, int defaultValue, int nEnums, const char* label, int flags, const char* group, const char* listItems, ...)
+{
+  if (mType == kTypeNone) mType = kTypeNote;
+
+  InitInt(name, defaultValue, 0, nEnums - 1, label, flags | kFlagStepped, group);
+
+  if (listItems)
+  {
+    SetDisplayText(0, listItems);
+
+    va_list args;
+    va_start(args, listItems);
+    for (auto i = 1; i < nEnums; ++i)
+      SetDisplayText(i, va_arg(args, const char*));
+    va_end(args);
+  }
+}
+
 void IParam::InitInt(const char* name, int defaultVal, int minVal, int maxVal, const char* label, int flags, const char* group)
 {
   if (mType == kTypeNone) mType = kTypeInt;
@@ -201,9 +219,20 @@ void IParam::InitGain(const char *name, double defaultVal, double minVal, double
   InitDouble(name, defaultVal, minVal, maxVal, step, "dB", flags, group, ShapeLinear(), kUnitDB);
 }
 
+void IParam::InitDB(const char* name, double defaultVal, double minVal, double maxVal, double step, int flags, const char* group)
+{
+  const double kDBCurve = 0.26849;
+  InitDouble(name, defaultVal, minVal, maxVal, step, "dB", flags | IParam::kFlagMinusInfDisplay | IParam::kFlagForceRound, group, IParam::ShapePowCurve(kDBCurve), IParam::kUnitDB);
+}
+
 void IParam::InitPercentage(const char *name, double defaultVal, double minVal, double maxVal, int flags, const char *group)
 {
   InitDouble(name, defaultVal, minVal, maxVal, 1, "%", flags, group, ShapeLinear(), kUnitPercentage);
+}
+
+void IParam::InitPan(const char* name, double defaultVal, double minVal, double maxVal, int flags, const char* group)
+{
+  InitDouble(name, defaultVal, minVal, maxVal, 1, "", flags, group, ShapeLinear(), kUnitPan);
 }
 
 void IParam::InitAngleDegrees(const char *name, double defaultVal, double minVal, double maxVal, int flags, const char *group)
@@ -254,9 +283,10 @@ void IParam::SetDisplayText(double value, const char* str)
   strcpy(pDT->mText, str);
 }
 
-void IParam::GetDisplayForHost(double value, bool normalized, WDL_String& str, bool withDisplayText) const
+void IParam::GetDisplayForHost(double value, bool normalized, WDL_String& str, bool withDisplayText, bool valueonly) const
 {
-  if (normalized) value = FromNormalized(value);
+  if (normalized)
+    value = FromNormalized(value);
 
   if (mDisplayFunction != nullptr)
   {
@@ -273,6 +303,25 @@ void IParam::GetDisplayForHost(double value, bool normalized, WDL_String& str, b
       str.Set(displayText, MAX_PARAM_DISPLAY_LEN);
       return;
     }
+  }
+
+  if ((mFlags & kFlagMinusInfDisplay) && (value == mMin))
+  {
+    str.Set("-inf.");
+    return;
+  }
+
+  if (mUnit == kUnitPan && !valueonly)
+  {
+    const int v = static_cast<int>(round(value));
+    if (v < 0)
+      str.SetFormatted(MAX_PARAM_DISPLAY_LEN, "%d%% left", -v);
+    else
+      if (v > 0)
+        str.SetFormatted(MAX_PARAM_DISPLAY_LEN, "%d%% right", v);
+      else
+        str.Set("Centred");
+    return;
   }
 
   double displayValue = value;
@@ -295,6 +344,13 @@ void IParam::GetDisplayForHost(double value, bool normalized, WDL_String& str, b
   }
   else
   {
+    if ((mFlags & kFlagForceRound) && displayValue)
+    {
+      const double factor = pow(10, -mDisplayPrecision);
+      displayValue = round(displayValue / factor) * factor;
+      if (displayValue == -0.0)
+        displayValue = 0.0;
+    }
     str.SetFormatted(MAX_PARAM_DISPLAY_LEN, "%.*f", mDisplayPrecision, displayValue);
   }
 }
@@ -341,6 +397,15 @@ bool IParam::MapDisplayText(const char* str, double* pValue) const
   int n = mDisplayTexts.GetSize();
   for (DisplayText* pDT = mDisplayTexts.Get(); n; --n, ++pDT)
   {
+    if (mType == kTypeNote)
+    {
+      if (!stricmp(str, pDT->mText))
+      {
+        *pValue = pDT->mValue;
+        return true;
+      }
+    }
+    else
     if (!strcmp(str, pDT->mText))
     {
       *pValue = pDT->mValue;
@@ -360,7 +425,22 @@ double IParam::StringToValue(const char* str) const
 
   if (!mapped && Type() != kTypeEnum && Type() != kTypeBool)
   {
-    v = atof(str);
+    // z> if ',' if localized decimal separator then replace it '.'
+    if (strstr(str, ",") != NULL)
+    {
+      char* sp = strdup(str);
+      char* s = sp;
+      while (*s != '\0')
+      {
+        if (*s == ',')
+          *s = '.';
+        s++;
+      }
+      v = atof(sp);
+      free(sp);
+    }
+    else
+      v = atof(str);
 
     if (mFlags & kFlagNegateDisplay)
       v = -v;
@@ -412,4 +492,20 @@ void IParam::GetJSON(WDL_String& json, int idx) const
 void IParam::PrintDetails() const
 {
   DBGMSG("%s %f", GetNameForHost(), Value());
+}
+
+void IParam::Inc() 
+{
+  double v = mValue.load() + mStep;
+  if (v > mMax)
+    v = mMin;
+  Set(v);
+}
+
+void IParam::Dec() 
+{
+  double v = mValue.load() - mStep;
+  if (v < mMin)
+    v = mMax;
+  Set(v);
 }

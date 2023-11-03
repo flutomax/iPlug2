@@ -48,6 +48,7 @@ public:
   void OnMouseUp(float x, float y, const IMouseMod& mod) override;
   void OnMouseDblClick(float x, float y, const IMouseMod& mod) override;
   void OnEndAnimation() override;
+  void OnLostFocus() override;
   
   static int DeleteChars(ITextEntryControl* _this, size_t pos, size_t num);
   static int InsertChars(ITextEntryControl* _this, size_t pos, const char16_t* text, size_t num);
@@ -55,6 +56,7 @@ public:
   static float GetCharWidth(ITextEntryControl* _this, int n, int i);
   static char16_t GetChar(ITextEntryControl* _this, int pos);
   static int GetLength(ITextEntryControl* _this);
+  static int GetParamIndex(ITextEntryControl* _this);
 
   bool EditInProgress() { return mEditing; }
   void DismissEdit();
@@ -83,6 +85,7 @@ private:
   bool mCursorIsSet = false;
   bool mCursorSizesValid = false;
   bool mNotifyTextChange = false;
+  int fParamIndex = -1;
 
   STB_TexteditState mEditState;
   WDL_TypedBuf<float> mCharWidths;

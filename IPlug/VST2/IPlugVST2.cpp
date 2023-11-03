@@ -662,6 +662,7 @@ VstIntPtr VSTCALLBACK IPlugVST2::VSTDispatcher(AEffect *pEffect, VstInt32 opCode
     }
     case effGetSpeakerArrangement:
     {
+      /* Z
       VstSpeakerArrangement** ppInputArr = (VstSpeakerArrangement**) value;
       VstSpeakerArrangement** ppOutputArr = (VstSpeakerArrangement**) ptr;
       if (ppInputArr)
@@ -673,6 +674,12 @@ VstIntPtr VSTCALLBACK IPlugVST2::VSTDispatcher(AEffect *pEffect, VstInt32 opCode
         *ppOutputArr = &(_this->mOutputSpkrArr);
       }
       return 1;
+      */
+      VstSpeakerArrangement** ppInputArr = (VstSpeakerArrangement**)value;
+      VstSpeakerArrangement** ppOutputArr = (VstSpeakerArrangement**)ptr;
+      if (ppInputArr) *ppInputArr = nullptr;
+      if (ppOutputArr) *ppOutputArr = nullptr;
+      return 0;
     }
     case effGetEffectName:
     {
@@ -878,9 +885,12 @@ VstIntPtr VSTCALLBACK IPlugVST2::VSTDispatcher(AEffect *pEffect, VstInt32 opCode
     {
       return VST_VERSION;
     }
+    /* // Z - no correct translate char from NUMPAD
     case effEditKeyDown:
     case effEditKeyUp:
     {
+
+      
       char str[2];
       str[0] = static_cast<char>(idx);
       str[1] = '\0';
@@ -900,7 +910,9 @@ VstIntPtr VSTCALLBACK IPlugVST2::VSTDispatcher(AEffect *pEffect, VstInt32 opCode
         handled = _this->OnKeyUp(keyPress);
 
       return handled ? 1 : 0;
-    }
+     
+
+    }  */
     case effEndSetProgram:
     case effBeginSetProgram:
     case effGetMidiProgramName:

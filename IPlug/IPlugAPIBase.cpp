@@ -120,8 +120,10 @@ void IPlugAPIBase::SetHost(const char* host, int version)
 void IPlugAPIBase::SetParameterValue(int idx, double normalizedValue)
 {
   Trace(TRACELOC, "%d:%f", idx, normalizedValue);
-  GetParam(idx)->SetNormalized(normalizedValue);
-  InformHostOfParamChange(idx, normalizedValue);
+  IParam* param = GetParam(idx);
+  param->SetNormalized(normalizedValue);
+  if (!param->GetHidden())
+    InformHostOfParamChange(idx, normalizedValue);
   OnParamChange(idx, kUI);
 }
 
@@ -136,12 +138,18 @@ void IPlugAPIBase::DirtyParametersFromUI()
 
 void IPlugAPIBase::SendParameterValueFromAPI(int paramIdx, double value, bool normalized)
 {
+  if (GetParam(paramIdx)->GetHidden())
+    return;
   //TODO: Can we assume that no host is stupid enough to try and set parameters on multiple threads at the same time?
   // If that is the case then we need a MPSPC queue not SPSC
   if (normalized)
     value = GetParam(paramIdx)->FromNormalized(value);
-  
-  mParamChangeFromProcessor.Push(ParamTuple { paramIdx, value } );
+#ifdef VST2_API
+  SendParameterValueFromDelegate(paramIdx, value, false); // ! ZEF
+#else
+  mParamChangeFromProcessor.Push(ParamTuple{ paramIdx, value });
+  OnParamChange(paramIdx, kHost);
+#endif
 }
 
 void IPlugAPIBase::OnTimer(Timer& t)
@@ -191,6 +199,14 @@ void IPlugAPIBase::OnTimer(Timer& t)
   }
   
   OnIdle();
+}
+
+bool IPlugAPIBase::EditorResizeFromUI(int viewWidth, int viewHeight, bool needsPlatformResize)
+{
+  if (needsPlatformResize)
+    return EditorResize(viewWidth, viewHeight);
+  else
+    return true;
 }
 
 void IPlugAPIBase::SendMidiMsgFromUI(const IMidiMsg& msg)

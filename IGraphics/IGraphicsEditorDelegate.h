@@ -84,6 +84,9 @@ public:
    * @param startPos The start position in the chunk where parameter values are stored
    * @return The new chunk position (endPos) */
   int UnserializeEditorSize(const IByteChunk& chunk, int startPos);
+
+  void OnParamChangeUI(int paramIdx, EParamSource source = kUnknown) override;
+  void ResetLastEditorSize();
     
 protected:
   std::function<IGraphics*()> mMakeGraphicsFunc = nullptr;

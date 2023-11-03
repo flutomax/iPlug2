@@ -83,10 +83,14 @@ public:
   virtual void DrawPanelShadow(IGraphics& g, MenuPanel* panel);
   /** Override this method to change the way a cell's background is drawn */
   virtual void DrawCellBackground(IGraphics& g, const IRECT& bounds, const IPopupMenu::Item* pItem, bool sel, IBlend* pBlend);
+  /** Z: DrawItemText procedure draw text & chortcut */
+  virtual void DrawItemText(IGraphics& g, const IRECT& textRect, const IPopupMenu::Item* pItem, IBlend* pBlend);
   /** Override this method to change the way a cell's text is drawn */
   virtual void DrawCellText(IGraphics& g, const IRECT& bounds, const IPopupMenu::Item* pItem, bool sel, IBlend* pBlend);
   /** Override this method to change the way a checked cell's "tick" is drawn */
   virtual void DrawTick(IGraphics& g, const IRECT& bounds, const IPopupMenu::Item* pItem, bool sel, IBlend* pBlend);
+  /** Override this method to change the way a checked cell's "tick" is drawn */
+  virtual void DrawCheck(IGraphics& g, const IRECT& bounds, const IPopupMenu::Item* pItem, bool sel, IBlend* pBlend);
   /** Override this method to change the way a submenu cell's arrow is drawn */
   virtual void DrawSubMenuArrow(IGraphics& g, const IRECT& bounds, const IPopupMenu::Item* pItem, bool sel, IBlend* pBlend);
   /** Override this method to change the way a scroll up cell's arrow is drawn */
@@ -192,13 +196,17 @@ private:
   float mSeparatorSize = 2.; // The size in pixels of a separator. This could be width or height
   float mRoundness = 5.f; // The roundness of the corners of the menu panel backgrounds
   float mDropShadowSize = 10.f; // The size in pixels of the drop shadow
-  float mOpacity = 0.95f; // The opacity of the menu panel backgrounds when fully faded in
-
+#ifdef IGRAPHICS_NANOVG
+  float mOpacity = 0.89f; // The opacity of the menu panel backgrounds when fully faded in
+#else
+  float mOpacity = 0.8f;
+#endif
   const float TEXT_HPAD = 5.; // The amount of horizontal padding on either side of cell text in pixels
   const float TICK_SIZE = 10.; // The size of the area on the left of the cell where a tick mark appears on checked items - actual
-  const float ARROW_SIZE = 8; // The width of the area on the right of the cell where an arrow appears for new submenus
+  const float ARROW_SIZE = 6; // The width of the area on the right of the cell where an arrow appears for new submenus
   const float PAD = 5.; // How much white space between the background and the cells
   const float CALLOUT_SPACE = 8; // The space between start bounds and callout
+  IRECT mOriginalBounds; // The rectangular area where the menu was triggered
   IRECT mAnchorArea; // The area where the menu was triggered; menu will be adjacent, but won't occupy it.
   EArrowDir mCalloutArrowDir = kEast;
   IRECT mCalloutArrowBounds;

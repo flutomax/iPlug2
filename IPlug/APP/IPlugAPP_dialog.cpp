@@ -549,6 +549,8 @@ WDL_DLGRET IPlugAPPHost::MainDlgProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPA
       height = pAppHost->GetPlug()->GetEditorHeight();
       ClientResize(hwndDlg, width, height);
 
+      SendMessage(hwndDlg, WM_SETICON, 0, (LPARAM)LoadIcon(gHINSTANCE, MAKEINTRESOURCE(IDI_ICON1)));
+
       ShowWindow(hwndDlg,SW_SHOW);
       return 1;
     case WM_DESTROY:

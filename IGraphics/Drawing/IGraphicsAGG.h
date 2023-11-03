@@ -266,6 +266,7 @@ public:
 
 protected:
   APIBitmap* LoadAPIBitmap(const char* fileNameOrResID, int scale, EResourceLocation location, const char* ext) override;
+  APIBitmap* LoadAPIBitmapFromMemory(const void* pData, int size, int scale) override;
   APIBitmap* CreateAPIBitmap(int width, int height, int scale, double drawScale) override;
 
   bool LoadAPIFont(const char* fontID, const PlatformFontPtr& font) override;

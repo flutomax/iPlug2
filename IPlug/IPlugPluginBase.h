@@ -441,6 +441,8 @@ public:
   /** Default parameter values for a parameter group  */
   void PrintParamValues();
 
+  WDL_PtrList<IPreset>* GetPresets() { return &mPresets; }
+
 protected:
   int mCurrentPresetIdx = 0;
   /** \c true if the plug-in does opaque state chunks. If false the host will provide a default interface */

@@ -32,16 +32,20 @@ public:
   void CloseWindow() override;
   bool WindowIsOpen() override;
   void PlatformResize(bool parentHasResized) override;
+
+  void AttachGestureRecognizer(EGestureType type) override;
   
   void HideMouseCursor(bool hide, bool lock) override;
   void MoveMouseCursor(float x, float y) override;
   ECursor SetMouseCursor(ECursor cursorType) override;
   
+  
+  
   void GetMouseLocation(float& x, float&y) const override;
 
   void DoCursorLock(float x, float y, float& prevX, float& prevY);
     
-  EMsgBoxResult ShowMessageBox(const char* str, const char* caption, EMsgBoxType type, IMsgBoxCompletionHanderFunc completionHandler) override;
+  EMsgBoxResult ShowMessageBox(const char* str, const char* caption, EMsgBoxType type, EMsgBoxIcon icon,IMsgBoxCompletionHanderFunc completionHandler) override;
   void ForceEndUserEdit() override;
 
   const char* GetPlatformAPIStr() override;

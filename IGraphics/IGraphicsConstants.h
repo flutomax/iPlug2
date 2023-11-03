@@ -138,7 +138,7 @@ enum class ELineCap { Butt, Round, Square };
 enum class ELineJoin { Miter, Round, Bevel };
 
 /** /todo */
-enum class EPatternType { Solid, Linear, Radial };
+enum class EPatternType { Solid, Linear, Radial, Sweep };
 
 /** /todo */
 enum class EPatternExtend { None, Pad, Reflect, Repeat };
@@ -161,8 +161,11 @@ enum class ECursor
   SIZEALL,
   INO,
   HAND,
+  HANDCLOSED,
+  HANDOPEN,
   APPSTARTING,
-  HELP
+  HELP,
+  DRAGNDROP,
 };
 
 /** /todo */
@@ -176,6 +179,15 @@ enum EMsgBoxType
   kMB_YESNOCANCEL = 3,
   kMB_YESNO = 4,
   kMB_RETRYCANCEL = 5
+};
+
+enum EMsgBoxIcon
+{
+  kMB_NONE = 0,
+  kMB_ICONHAND = 1,
+  kMB_ICONQUESTION = 2,
+  kMB_ICONEXCLAMATION = 3,
+  kMB_ICONASTERISK = 4
 };
 
 // This enumeration must match win32 message box results

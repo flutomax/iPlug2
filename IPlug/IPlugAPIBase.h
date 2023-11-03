@@ -148,7 +148,7 @@ public:
   
   void EndInformHostOfParamChangeFromUI(int paramIdx) override { EndInformHostOfParamChange(paramIdx); }
   
-  bool EditorResizeFromUI(int viewWidth, int viewHeight) override { return EditorResize(viewWidth, viewHeight); }
+  bool EditorResizeFromUI(int viewWidth, int viewHeight, bool needsPlatformResize) override;
   
   void SendParameterValueFromUI(int paramIdx, double normalisedValue) override
   {

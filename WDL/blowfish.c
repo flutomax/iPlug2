@@ -3,6 +3,7 @@
  * E-mail     :  pck@netcom.com
  * Date       :  1997
  * Description:  C implementation of the Blowfish algorithm.
+ * reformate by ZEF 2020
 
 */
 
@@ -19,7 +20,7 @@ static const unsigned int ORIG_P[16 + 2] = {
 
 };
 
-static const unsigned int ORIG_S[4*256] = {
+static const unsigned int ORIG_S[4 * 256] = {
         0xD1310BA6L, 0x98DFB5ACL, 0x2FFD72DBL, 0xD01ADFB7L,
         0xB8E1AFEDL, 0x6A267E96L, 0xBA7C9045L, 0xF12C7F99L,
         0x24A19947L, 0xB3916CF7L, 0x0801F2E2L, 0x858EFC16L,
@@ -283,38 +284,38 @@ static const unsigned int ORIG_S[4*256] = {
 
 static char __bigE;
 
-static void BSWAPONBIGE(unsigned int *a,unsigned int *a2)
+static void BSWAPONBIGE(unsigned int* a, unsigned int* a2)
 {
-  if (__bigE>0)
+  if (__bigE > 0)
   {
-    unsigned char *b=(unsigned char *)a;
-    unsigned char c=b[0];
-    b[0]=b[3];
-    b[3]=c;
-    c=b[1];
-    b[1]=b[2];
-    b[2]=c;
+    unsigned char* b = (unsigned char*)a;
+    unsigned char c = b[0];
+    b[0] = b[3];
+    b[3] = c;
+    c = b[1];
+    b[1] = b[2];
+    b[2] = c;
 
-    b=(unsigned char *)a2;
-    c=b[0];
-    b[0]=b[3];
-    b[3]=c;
-    c=b[1];
-    b[1]=b[2];
-    b[2]=c;
+    b = (unsigned char*)a2;
+    c = b[0];
+    b[0] = b[3];
+    b[3] = c;
+    c = b[1];
+    b[1] = b[2];
+    b[2] = c;
 
   }
 }
 
-void Blowfish_Encrypt(BLOWFISH_CTX *ctx, unsigned int *xl, unsigned int *xr) 
+void Blowfish_Encrypt(BLOWFISH_CTX* ctx, unsigned int* xl, unsigned int* xr)
 {
-  BSWAPONBIGE(xl,xr);
+  BSWAPONBIGE(xl, xr);
   {
-    unsigned int Xl=*xl;
-    unsigned int Xr=*xr;
-    int i=N/2;
-    unsigned int *p=ctx->P;
-    unsigned int *s=(unsigned int *)ctx->S;
+    unsigned int Xl = *xl;
+    unsigned int Xr = *xr;
+    int i = N / 2;
+    unsigned int* p = ctx->P;
+    unsigned int* s = (unsigned int*)ctx->S;
     while (i--)
     {
       Xl ^= *p++;
@@ -324,18 +325,18 @@ void Blowfish_Encrypt(BLOWFISH_CTX *ctx, unsigned int *xl, unsigned int *xr)
     *xr = Xl ^ *p++;
     *xl = Xr ^ *p;
   }
-  BSWAPONBIGE(xl,xr);
+  BSWAPONBIGE(xl, xr);
 }
 
-void Blowfish_Decrypt(BLOWFISH_CTX *ctx, unsigned int *xl, unsigned int *xr) 
+void Blowfish_Decrypt(BLOWFISH_CTX* ctx, unsigned int* xl, unsigned int* xr)
 {
-  BSWAPONBIGE(xl,xr);
+  BSWAPONBIGE(xl, xr);
   {
-    unsigned int Xl=*xl;
-    unsigned int Xr=*xr;
-    unsigned int *p=ctx->P + N + 1;
-    unsigned int *s=(unsigned int *)ctx->S;
-    int i=N/2;
+    unsigned int Xl = *xl;
+    unsigned int Xr = *xr;
+    unsigned int* p = ctx->P + N + 1;
+    unsigned int* s = (unsigned int*)ctx->S;
+    int i = N / 2;
     while (i--)
     {
       Xl ^= *p--;
@@ -345,55 +346,57 @@ void Blowfish_Decrypt(BLOWFISH_CTX *ctx, unsigned int *xl, unsigned int *xr)
     *xr = Xl ^ *p--;
     *xl = Xr ^ *p;
   }
-  BSWAPONBIGE(xl,xr);
+  BSWAPONBIGE(xl, xr);
 }
 
-void Blowfish_Init(BLOWFISH_CTX *ctx, unsigned char *key, int keyLen) {
-  int i, j=0;
-  unsigned int *s=(unsigned int *)ORIG_P;
-  unsigned int *p=ctx->P;
+void Blowfish_Init(BLOWFISH_CTX* ctx, unsigned char* key, int keyLen) {
+  int i, j = 0;
+  unsigned int* s = (unsigned int*)ORIG_P;
+  unsigned int* p = ctx->P;
 
-  unsigned int datal=0, datar=0;
+  unsigned int datal = 0, datar = 0;
 
   if (!__bigE)
   {
-    int a=1;
-    __bigE = (*(char *)&a) ? -1 : 1;
+    int a = 1;
+    __bigE = (*(char*)& a) ? -1 : 1;
   }
 
-  i=N+2;
-  while (i--) 
+  i = N + 2;
+  while (i--)
   {
-    int k=4;
+    int k = 4;
     unsigned int data = 0;
     while (k--)
     {
       data = (data << 8) | key[j];
       if (++j >= keyLen) j = 0;
     }
-    *p++=*s++ ^ data;
+    *p++ = *s++ ^ data;
   }
-  for(i=0;i<256*4; i++) ctx->S[i]=ORIG_S[i];
+  for (i = 0;i < 256 * 4; i++) ctx->S[i] = ORIG_S[i];
 
-  p=ctx->P;
-  i=(N+2)/2;
+  p = ctx->P;
+  i = (N + 2) / 2;
   while (i--)
   {
-    BSWAPONBIGE(&datal,&datar);
+    BSWAPONBIGE(&datal, &datar);
     Blowfish_Encrypt(ctx, &datal, &datar);
-    BSWAPONBIGE(&datal,&datar);
-    *p++=datal;
-    *p++=datar;
+    BSWAPONBIGE(&datal, &datar);
+    *p++ = datal;
+    *p++ = datar;
   }
 
-  s=ctx->S;
-  i=256/2*4;
+  s = ctx->S;
+  i = 256 / 2 * 4;
   while (i--)
   {
-    BSWAPONBIGE(&datal,&datar);
+    BSWAPONBIGE(&datal, &datar);
     Blowfish_Encrypt(ctx, &datal, &datar);
-    BSWAPONBIGE(&datal,&datar);
+    BSWAPONBIGE(&datal, &datar);
     *s++ = datal;
     *s++ = datar;
   }
 }
+
+

@@ -777,10 +777,19 @@ void IKnobControlBase::OnMouseDrag(float x, float y, float dX, float dY, const I
   IRECT dragBounds = GetKnobDragBounds();
 
   if (mDirection == EDirection::Vertical)
-    SetValue(GetValue() + (double) dY / (double)(dragBounds.T - dragBounds.B) / gearing);
+    mMouseDragValue += static_cast<double>(dY / static_cast<double>(dragBounds.T - dragBounds.B) / gearing);
   else
-    SetValue(GetValue() + (double) dX / (double)(dragBounds.R - dragBounds.L) / gearing);
+    mMouseDragValue += static_cast<double>(dX / static_cast<double>(dragBounds.R - dragBounds.L) / gearing);
 
+  mMouseDragValue = Clip(mMouseDragValue, 0., 1.);
+
+  double v = mMouseDragValue;
+  const IParam * pParam = GetParam();
+
+  if (pParam && pParam->GetStepped() && pParam->GetStep() > 0)
+    v = pParam->ConstrainNormalized(mMouseDragValue);
+
+  SetValue(v);
   SetDirty();
 }
 
@@ -941,7 +950,16 @@ ISliderControlBase::ISliderControlBase(const IRECT& bounds, int paramIdx, EDirec
 void ISliderControlBase::OnMouseDown(float x, float y, const IMouseMod& mod)
 {
   mMouseDown = true;
-  SnapToMouse(x, y, mDirection, mTrackBounds);
+
+  if (GetParam())
+  {
+    if (!GetParam()->GetStepped())
+      SnapToMouse(x, y, mDirection, mTrackBounds);
+  }
+  else
+    SnapToMouse(x, y, mDirection, mTrackBounds);
+
+  mMouseDragValue = GetValue();
 
   if (mHideCursorOnDrag)
     GetUI()->HideMouseCursor(true, true);
@@ -959,20 +977,41 @@ void ISliderControlBase::OnMouseUp(float x, float y, const IMouseMod& mod)
 
 void ISliderControlBase::OnMouseDrag(float x, float y, float dX, float dY, const IMouseMod& mod)
 {
-  if(mod.touchID)
+  const IParam* pParam = GetParam();
+
+  if (mod.touchID || !mHideCursorOnDrag)
   {
-    SnapToMouse(x, y, mDirection, mTrackBounds);
-  }
-  else
-  {
-    double gearing = IsFineControl(mod, false) ? mGearing * 10.0 : mGearing;
-    
-    if (mDirection == EDirection::Vertical)
-      SetValue(GetValue() + (static_cast<double>(dY) / static_cast<double>(mTrackBounds.T - mTrackBounds.B) / gearing));
+    if (pParam)
+    {
+      if (!pParam->GetStepped())
+      {
+        SnapToMouse(x, y, mDirection, mTrackBounds);
+        return;
+      }
+      // non-stepped parameter, fall through
+    }
     else
-      SetValue(GetValue() + (static_cast<double>(dX) / static_cast<double>(mTrackBounds.R - mTrackBounds.L) / gearing));
+    {
+      SnapToMouse(x, y, mDirection, mTrackBounds);
+      return;
+    }
   }
-  
+
+  double gearing = IsFineControl(mod, false) ? mGearing * 10.0 : mGearing;
+
+  if (mDirection == EDirection::Vertical)
+    mMouseDragValue += static_cast<double>(dY / static_cast<double>(mTrackBounds.T - mTrackBounds.B) / gearing);
+  else
+    mMouseDragValue += static_cast<double>(dX / static_cast<double>(mTrackBounds.R - mTrackBounds.L) / gearing);
+
+  mMouseDragValue = Clip(mMouseDragValue, 0., 1.);
+
+  double v = mMouseDragValue;
+
+  if (pParam && pParam->GetStepped() && pParam->GetStep() > 0)
+    v = pParam->ConstrainNormalized(mMouseDragValue);
+
+  SetValue(v);
   SetDirty(true);
 }
 
