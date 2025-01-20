@@ -69,8 +69,9 @@ public:
 private:
   template<typename Proc>
   bool CallSTB(Proc proc);
+protected:
   void OnStateChanged();
-  void OnTextChange();
+  virtual void OnTextChange();
   void FillCharWidthCache();
   void CalcCursorSizes();
   float MeasureCharWidth(char16_t c, char16_t nc);

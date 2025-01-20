@@ -525,6 +525,11 @@ extern StaticStorage<CoreTextFontDescriptor> sFontDescriptorCache;
     if (mGraphics)
       mGraphics->SetScreenScale(newScale);
     
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(windowDidResign:)
+                                                 name:NSWindowDidResignKeyNotification
+                                               object:pWindow];
+    
     #ifdef IGRAPHICS_METAL
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(frameDidChange:)
@@ -543,6 +548,18 @@ extern StaticStorage<CoreTextFontDescriptor> sFontDescriptorCache;
 //    [[NSNotificationCenter defaultCenter] addObserver:self
 //                                             selector:@selector(windowFullscreened:) name:NSWindowDidExitFullScreenNotification
 //                                               object:pWindow];
+    
+    [NSEvent addLocalMonitorForEventsMatchingMask:(NSEventMaskLeftMouseDown |
+      NSEventMaskRightMouseDown | NSEventMaskOtherMouseDown) handler:^(NSEvent *event)
+    {
+      NSPoint pt = [self convertPoint:[event locationInWindow] fromView:nil];
+      if (!NSPointInRect(pt, self.bounds))
+      {
+        if (mGraphics)
+          mGraphics->OnLostFocus();
+      }
+      return event;
+    }];
   }
 }
 
@@ -1008,6 +1025,21 @@ static void MakeCursorFromName(NSCursor*& cursor, const char *name)
 {
   [mTimer invalidate];
   mTimer = 0;
+}
+
+- (BOOL) resignFirstResponder
+{
+  if (mTimer == nil)
+    return YES;
+  mGraphics->OnLostFocus();
+  return YES;
+}
+
+- (void) windowDidResign: (NSNotification*)notification
+{
+  if (mTimer == nil)
+    return;
+  mGraphics->OnLostFocus();
 }
 
 - (void) removeFromSuperview

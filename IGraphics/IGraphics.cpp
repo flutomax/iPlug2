@@ -881,7 +881,6 @@ void IGraphics::SetStrictDrawing(bool strict)
 void IGraphics::OnMouseDown(const std::vector<IMouseInfo>& points)
 {
 //  Trace("IGraphics::OnMouseDown", __LINE__, "x:%0.2f, y:%0.2f, mod:LRSCA: %i%i%i%i%i", x, y, mod.L, mod.R, mod.S, mod.C, mod.A);
-
   bool singlePoint = points.size() == 1;
   
 #ifdef IGRAPHICS_IMGUI
@@ -990,7 +989,6 @@ void IGraphics::OnMouseDown(const std::vector<IMouseInfo>& points)
 void IGraphics::OnMouseUp(const std::vector<IMouseInfo>& points)
 {
 //  Trace("IGraphics::OnMouseUp", __LINE__, "x:%0.2f, y:%0.2f, mod:LRSCA: %i%i%i%i%i", x, y, mod.L, mod.R, mod.S, mod.C, mod.A);
-  
   if (ControlIsCaptured())
   {
     for (auto& point : points)
@@ -1796,7 +1794,7 @@ void IGraphics::CreateTextEntry(IControl& control, const IText& text, const IREC
   mInTextEntry = &control;
   mTextEntryValIdx = valIdx;
     
-  int paramIdx = valIdx > kNoValIdx  ? control.GetParamIdx(valIdx) : kNoParameter;
+  int paramIdx = valIdx > kNoValIdx ? control.GetParamIdx(valIdx) : kNoParameter;
 
   if (mTextEntryControl)
     mTextEntryControl->CreateTextEntry(paramIdx, text, bounds, control.GetTextEntryLength(), str);
@@ -2038,6 +2036,23 @@ bool IGraphics::LoadFont(const char* fontID, const char* fileNameOrResID)
   }
   
   DBGMSG("Could not locate font %s\n", fileNameOrResID);
+  return false;
+}
+
+bool IGraphics::LoadFont(const char* fontID, void* pData, int dataSize)
+{
+  PlatformFontPtr font = LoadPlatformFont(fontID, pData, dataSize);
+
+  if (font)
+  {
+    if (LoadAPIFont(fontID, font))
+    {
+      CachePlatformFont(fontID, font);
+      return true;
+    }
+  }
+
+  DBGMSG("Could not load font %s\n", fontID);
   return false;
 }
 

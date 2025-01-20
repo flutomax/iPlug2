@@ -742,6 +742,7 @@ LRESULT CALLBACK IGraphicsWin::ParamEditProc(HWND hWnd, UINT msg, WPARAM wParam,
               else if (c == '-') break;
               else if (c == '+') break;
               else if (c == '.') break;
+              else if (c == ',') break;
               else return 0;
             case IParam::kTypeNote:
               if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'G') || (c >= 'a' && c <= 'g') || (c == '#'))
@@ -809,7 +810,7 @@ LRESULT CALLBACK IGraphicsWin::ParamEditProc(HWND hWnd, UINT msg, WPARAM wParam,
       }
     }
     return CallWindowProc(pGraphics->mDefEditProc, hWnd, msg, wParam, lParam);
-  }
+  }     
   return DefWindowProc(hWnd, msg, wParam, lParam);
 }
 
@@ -1511,10 +1512,10 @@ void IGraphicsWin::CreatePlatformTextEntry(int paramIdx, const IText& text, cons
   const float scale = GetTotalScale();
   IRECT scaledBounds = bounds.GetScaled(scale);
 
-  WCHAR strWide[MAX_PARAM_DISPLAY_LEN];
-  UTF8ToUTF16(strWide, str, MAX_PARAM_DISPLAY_LEN);
+  WCHAR strWide[MAX_PRESET_NAME_LEN];
+  UTF8ToUTF16(strWide, str, MAX_PRESET_NAME_LEN);
 
-  mParamEditWnd = CreateWindowW(L"EDIT", strWide, ES_AUTOHSCROLL /*only works for left aligned text*/ | WS_CHILD | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_VISIBLE | ES_MULTILINE | editStyle,
+  mParamEditWnd = CreateWindowW(L"EDIT", strWide, ES_AUTOHSCROLL | WS_CHILD | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_VISIBLE | ES_MULTILINE | editStyle,
     scaledBounds.L, scaledBounds.T, scaledBounds.W()+1, scaledBounds.H()+1,
     mPlugWnd, (HMENU) PARAM_EDIT_ID, mHInstance, 0);
 
@@ -1547,9 +1548,9 @@ void IGraphicsWin::CreatePlatformTextEntry(int paramIdx, const IText& text, cons
   }
 
   SetFocus(mParamEditWnd);
-
-  mDefEditProc = (WNDPROC) SetWindowLongPtr(mParamEditWnd, GWLP_WNDPROC, (LONG_PTR) ParamEditProc);
-  SetWindowLongPtr(mParamEditWnd, GWLP_USERDATA, 0xdeadf00b);
+  SetWindowLongPtrW(mParamEditWnd, GWLP_WNDPROC, GetWindowLongPtrW(mParamEditWnd, GWLP_WNDPROC));
+  mDefEditProc = (WNDPROC) SetWindowLongPtrW(mParamEditWnd, GWLP_WNDPROC, (LONG_PTR) ParamEditProc);
+  SetWindowLongPtr(mParamEditWnd, GWLP_USERDATA, 0xdeadf00b);  
 }
 
 bool IGraphicsWin::RevealPathInExplorerOrFinder(WDL_String& path, bool select)
@@ -1995,65 +1996,43 @@ PlatformFontPtr IGraphicsWin::LoadPlatformFont(const char* fontID, const char* f
 {
   StaticStorage<InstalledFont>::Accessor fontStorage(sPlatformFontCache);
 
-  std::unique_ptr<InstalledFont> pFont;
   void* pFontMem = nullptr;
   int resSize = 0;
   WDL_String fullPath;
- 
-  EResourceLocation fontLocation = LocateResource(fileNameOrResID, "ttf", fullPath, GetBundleID(), GetWinModuleHandle(), nullptr);
 
-  if (fontLocation == kNotFound)
-  {
-    fontLocation = LocateResource(fileNameOrResID, "otf", fullPath, GetBundleID(), GetWinModuleHandle(), nullptr);
-  }
+  const EResourceLocation fontLocation = LocateResource(fileNameOrResID, "ttf", fullPath, GetBundleID(), GetWinModuleHandle(), nullptr);
 
   if (fontLocation == kNotFound)
     return nullptr;
 
   switch (fontLocation)
   {
-    case kAbsolutePath:
-    {
-      HANDLE file = CreateFile(fullPath.Get(), GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-      if (file)
-      {
-        HANDLE mapping = CreateFileMapping(file, NULL, PAGE_READONLY, 0, 0, NULL);
-        if (mapping)
-        {
-          pFontMem = MapViewOfFile(mapping, FILE_MAP_READ, 0, 0, 0);
-          pFont = std::make_unique<InstalledFont>(pFontMem, resSize);
-          UnmapViewOfFile(pFontMem);
-          CloseHandle(mapping);
-        }
-        CloseHandle(file);
-      }
-    }
-    break;
-    case kWinBinary:
-    {
-      pFontMem = const_cast<void *>(LoadWinResource(fullPath.Get(), "ttf", resSize, GetWinModuleHandle()));
-      if (pFontMem == nullptr)
-        pFontMem = const_cast<void *>(LoadWinResource(fullPath.Get(), "otf", resSize, GetWinModuleHandle()));
-      pFont = std::make_unique<InstalledFont>(pFontMem, resSize);
-    }
-    break;
-  } 
-
-  if (pFontMem && pFont && pFont->IsValid())
+  case kAbsolutePath:
   {
-    IFontInfo fontInfo(pFontMem, resSize, 0);
-    WDL_String family = fontInfo.GetFamily();
-    int weight = fontInfo.IsBold() ? FW_BOLD : FW_REGULAR;
-    bool italic = fontInfo.IsItalic();
-    bool underline = fontInfo.IsUnderline();
-
-    HFONT font = GetHFont(family.Get(), weight, italic, underline);
-
-    if (font)
+    HANDLE file = CreateFile(fullPath.Get(), GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    PlatformFontPtr ret = nullptr;
+    if (file)
     {
-      fontStorage.Add(pFont.release(), fileNameOrResID);
-      return PlatformFontPtr(new Font(font, "", false));
+      HANDLE mapping = CreateFileMapping(file, NULL, PAGE_READONLY, 0, 0, NULL);
+      if (mapping)
+      {
+        resSize = (int)GetFileSize(file, nullptr);
+        pFontMem = MapViewOfFile(mapping, FILE_MAP_READ, 0, 0, 0);
+        ret = LoadPlatformFont(fontID, pFontMem, resSize);
+        UnmapViewOfFile(pFontMem);
+        CloseHandle(mapping);
+      }
+      CloseHandle(file);
     }
+    return ret;
+  }
+  break;
+  case kWinBinary:
+  {
+    pFontMem = const_cast<void*>(LoadWinResource(fullPath.Get(), "ttf", resSize, GetWinModuleHandle()));
+    return LoadPlatformFont(fontID, pFontMem, resSize);
+  }
+  break;
   }
 
   return nullptr;
@@ -2069,6 +2048,36 @@ PlatformFontPtr IGraphicsWin::LoadPlatformFont(const char* fontID, const char* f
   HFONT font = GetHFont(fontName, weight, italic, underline, quality, true);
 
   return PlatformFontPtr(font ? new Font(font, TextStyleString(style), true) : nullptr);
+}
+
+PlatformFontPtr IGraphicsWin::LoadPlatformFont(const char* fontID, void* pData, int dataSize)
+{
+  StaticStorage<InstalledFont>::Accessor fontStorage(sPlatformFontCache);
+
+  std::unique_ptr<InstalledFont> pFont;
+  void* pFontMem = pData;
+  int resSize = dataSize;
+
+  pFont = std::make_unique<InstalledFont>(pFontMem, resSize);
+
+  if (pFontMem && pFont && pFont->IsValid())
+  {
+    IFontInfo fontInfo(pFontMem, resSize, 0);
+    WDL_String family = fontInfo.GetFamily();
+    int weight = fontInfo.IsBold() ? FW_BOLD : FW_REGULAR;
+    bool italic = fontInfo.IsItalic();
+    bool underline = fontInfo.IsUnderline();
+
+    HFONT font = GetHFont(family.Get(), weight, italic, underline);
+
+    if (font)
+    {
+      fontStorage.Add(pFont.release(), fontID);
+      return PlatformFontPtr(new Font(font, "", false));
+    }
+  }
+
+  return nullptr;
 }
 
 void IGraphicsWin::CachePlatformFont(const char* fontID, const PlatformFontPtr& font)

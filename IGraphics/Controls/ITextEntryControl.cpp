@@ -84,10 +84,9 @@ ITextEntryControl::ITextEntryControl()
       auto progress = pCaller->GetAnimationProgress();
       
       if(progress > 0.5) {
-        mDrawCursor = false;
-        pCaller->SetDirty(false);
+        mDrawCursor = false;       
       }
-   
+      pCaller->SetDirty(false);
       if(progress > 1.) {
         pCaller->OnEndAnimation();
         return;
@@ -342,7 +341,7 @@ void ITextEntryControl::OnEndAnimation()
 
 void ITextEntryControl::OnLostFocus()
 {
-  DismissEdit();
+  CommitEdit();
 }
 
 void ITextEntryControl::CopySelection()

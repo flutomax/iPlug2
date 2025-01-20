@@ -1,13 +1,16 @@
 /*
  ==============================================================================
- 
- This file is part of the iPlug 2 library. Copyright (C) the iPlug 2 developers. 
- 
+
+ This file is part of the iPlug 2 library. Copyright (C) the iPlug 2 developers.
+
  See LICENSE.txt for  more info.
- 
+
  ==============================================================================
 */
+#pragma once
 
+#include <math.h>
+#include "wdltypes.h"
 #include "denormal.h"
 #include "IPlugConstants.h"
 
@@ -21,13 +24,13 @@ private:
   T mOutM1[NC];
 
 public:
-  LogParamSmooth(double timeMs = 5., T initalValue = 0.)
+  LogParamSmooth(double timeMs = 5., T initialValue = 0.)
   {
     for (auto i = 0; i < NC; i++)
     {
-      mOutM1[i] = initalValue;
+      mOutM1[i] = initialValue;
     }
-    
+
     SetSmoothTime(timeMs, DEFAULT_SAMPLE_RATE);
   }
 
@@ -60,12 +63,12 @@ public:
   void SetSmoothTime(double timeMs, double sampleRate)
   {
     static constexpr double TWO_PI = 6.283185307179586476925286766559;
-    
+
     mA = exp(-TWO_PI / (timeMs * 0.001 * sampleRate));
     mB = 1.0 - mA;
   }
 
-  void ProcessBlock(T inputs[NC], T** outputs, int nFrames, int channelOffset = 0)
+  void ProcessBlock(T inputs[NC], T * *outputs, int nFrames, int channelOffset = 0)
   {
     const T b = mB;
     const T a = mA;
@@ -84,6 +87,38 @@ public:
     }
   }
 
+} WDL_FIXALIGN;
+
+template<typename T>
+class SmoothedGain
+{
+public:
+  SmoothedGain(double smoothingTime = 5.0)
+    : mSmoothingTime(smoothingTime)
+  {
+  }
+
+  void ProcessBlock(T** inputs, T** outputs, int nChans, int nFrames, double gainValue)
+  {
+    for (auto s = 0; s < nFrames; ++s)
+    {
+      const double smoothedGain = mSmoother.Process(gainValue);
+
+      for (auto c = 0; c < nChans; c++)
+      {
+        outputs[c][s] = inputs[c][s] * smoothedGain;
+      }
+    }
+  }
+
+  void SetSampleRate(double sampleRate)
+  {
+    mSmoother.SetSmoothTime(mSmoothingTime, sampleRate);
+  }
+
+private:
+  const double mSmoothingTime;
+  LogParamSmooth<double, 1> mSmoother;
 } WDL_FIXALIGN;
 
 END_IPLUG_NAMESPACE

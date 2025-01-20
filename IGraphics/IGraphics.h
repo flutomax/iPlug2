@@ -477,6 +477,13 @@ public:
    * @param fileNameOrResID A CString absolute path or resource ID
    * @return \c true on success */
   virtual bool LoadFont(const char* fontID, const char* fileNameOrResID);
+
+  /** Load a font from in-memory data to be used by the graphics context
+   * @param fontID A CString that will be used to reference the font
+   * @param pData Pointer to the font data in memory
+   * @param dataSize Size (in bytes) of data at \c pData
+   * @return \c true on success */
+  virtual bool LoadFont(const char* fontID, void* pData, int dataSize);
     
   /** \todo
    * @param fontID A CString that will be used to reference the font
@@ -853,6 +860,13 @@ public:
    * @param fileNameOrResID A resource or file name/path
    * @return PlatformFontPtr from which the platform font can be retrieved */
   virtual PlatformFontPtr LoadPlatformFont(const char* fontID, const char* fileNameOrResID) = 0;
+
+  /** Load a font from data in memory.
+   * @param fontID A CString that is used to reference the font
+   * @param pData Pointer to font data in memory
+   * @param dataSize Size (in bytes) of data at \c pData
+   * @return PlatformFontPtr from which the platform font may be retrieved */
+  virtual PlatformFontPtr LoadPlatformFont(const char* fontID, void* pData, int dataSize) = 0;
   
   /** Load a system font in a platform format.
    * @param fontID  A string that is used to reference the font

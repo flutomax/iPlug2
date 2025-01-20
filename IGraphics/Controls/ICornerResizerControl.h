@@ -56,6 +56,7 @@ public:
 
   void OnMouseDown(float x, float y, const IMouseMod& mod) override
   {
+    GetUI()->OnLostFocus();
     GetUI()->StartDragResize();
   }
     

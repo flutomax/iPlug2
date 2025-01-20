@@ -130,6 +130,8 @@ using namespace igraphics;
 - (void) render;
 - (void) onTimer: (NSTimer*) pTimer;
 - (void) killTimer;
+- (BOOL) resignFirstResponder;
+- (void) windowDidResign: (NSNotification*)notification;
 //mouse
 - (void) getMouseXY: (NSEvent*) pEvent : (float&) x : (float&) y;
 - (IMouseInfo) getMouseLeft: (NSEvent*) pEvent;
