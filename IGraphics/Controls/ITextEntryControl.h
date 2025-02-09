@@ -39,7 +39,7 @@ class ITextEntryControl : public IControl
 {
 public:
   ITextEntryControl();
-  
+  void SetStr(const char* str);
   //IControl
   void Draw(IGraphics& g) override;
   void OnMouseDown(float x, float y, const IMouseMod& mod) override;
@@ -48,7 +48,6 @@ public:
   void OnMouseUp(float x, float y, const IMouseMod& mod) override;
   void OnMouseDblClick(float x, float y, const IMouseMod& mod) override;
   void OnEndAnimation() override;
-  void OnLostFocus() override;
   
   static int DeleteChars(ITextEntryControl* _this, size_t pos, size_t num);
   static int InsertChars(ITextEntryControl* _this, size_t pos, const char16_t* text, size_t num);
@@ -62,8 +61,6 @@ public:
   void DismissEdit();
   void CommitEdit();
 
-  void SetStr(const char* str);
-
   void CreateTextEntry(int paramIdx, const IText& text, const IRECT& bounds, int length, const char* str);
 
 private:
@@ -71,7 +68,7 @@ private:
   bool CallSTB(Proc proc);
 protected:
   void OnStateChanged();
-  virtual void OnTextChange();
+  void OnTextChange();
   void FillCharWidthCache();
   void CalcCursorSizes();
   float MeasureCharWidth(char16_t c, char16_t nc);

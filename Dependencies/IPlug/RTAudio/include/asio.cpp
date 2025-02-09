@@ -128,7 +128,7 @@ ASIOError ASIOGetChannels(long *numInputChannels, long *numOutputChannels)
 		*numInputChannels = *numOutputChannels = 0;
 		return ASE_NotPresent;
 	}
-	return theAsioDriver->getChannels(numInputChannels, numOutputChannels);
+	return theAsioDriver->GetChannels(numInputChannels, numOutputChannels);
 }
 
 ASIOError ASIOGetLatencies(long *inputLatency, long *outputLatency)

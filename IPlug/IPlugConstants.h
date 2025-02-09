@@ -61,7 +61,6 @@ enum EVST3ParamIDs
 #endif
 };
 
-//TODO: these should be in a namespace, to avoid conflicts with third-party libraries
 static const double PI = 3.1415926535897932384626433832795;
 
 /** @brief Magic number for gain to dB conversion.
@@ -74,17 +73,17 @@ static const double AMP_DB = 8.685889638065036553;
  * @see DBToAmp
 */
 static const double IAMP_DB = 0.11512925464970;
-static const double DEFAULT_SAMPLE_RATE = 44100.0;
+static const double DEFAULT_SAMPLE_RATE = 48000.0;
 static const int MAX_PRESET_NAME_LEN = 256;
 #define UNUSED_PRESET_NAME "empty"
 #define DEFAULT_USER_PRESET_NAME "user preset"
 
 #define AU_MAX_IO_CHANNELS 128
 
-//TODO: check this shit really?
 #define MAX_MACOS_PATH_LEN 1024
 #define MAX_WIN32_PATH_LEN 256
 #define MAX_WIN32_PARAM_LEN 256
+#define IPLUG_WIN_MAX_WIDE_PATH 4096
 
 #define MAX_PLUGIN_NAME_LEN 128
 
@@ -104,7 +103,7 @@ static const int MAX_PARAM_DISPLAY_PRECISION = 6;
 #define PARAM_UNINIT 99.99e-9
 
 #ifndef MAX_BLOB_LENGTH
-#define MAX_BLOB_LENGTH 32768
+#define MAX_BLOB_LENGTH 2048
 #endif
 
 #ifndef IDLE_TIMER_RATE
@@ -229,15 +228,15 @@ enum EHost
   kHostBitwig,
   kHostWWW,
   
-  kHostReason,			
-  kHostGoldWave5x,	
-  kHostWaveform,		
-  kHostAudacity,		
-  kHostAcoustica,		
+  kHostReason,
+  kHostGoldWave5x,
+  kHostWaveform,
+  kHostAudacity,
+  kHostAcoustica,
   kHostPluginDoctor,
-  kHostiZotopeRX,		
-  kHostSAVIHost,		
-  kHostBlueCat,			
+  kHostiZotopeRX,
+  kHostSAVIHost,
+  kHostBlueCat,
   kHostMixbus32C
 
   // These hosts don't report the host name:

@@ -14,12 +14,6 @@
 #import <Metal/Metal.h>
 #endif
 
-#ifdef IGRAPHICS_IMGUI
-#import <Metal/Metal.h>
-#include "imgui.h"
-#import "imgui_impl_metal.h"
-#endif
-
 #include "wdlutf8.h"
 
 #import "IGraphicsMac_view.h"
@@ -154,12 +148,12 @@ static int MacKeyEventToVK(NSEvent* pEvent, int& flag)
 
 @implementation IGRAPHICS_MENU
 
-- (id) initWithIPopupMenuAndReciever: (IPopupMenu*) pMenu : (NSView*) pView
+- (id) initWithIPopupMenuAndReceiver: (IPopupMenu*) pMenu : (NSView*) pView
 {
   [self initWithTitle: @""];
 
-  NSMenuItem* nsMenuItem;
-  NSMutableString* nsMenuItemTitle;
+  NSMenuItem* nsMenuItem = nil;
+  NSMutableString* nsMenuItemTitle = nil;
 
   [self setAutoenablesItems:NO];
 
@@ -193,7 +187,7 @@ static int MacKeyEventToVK(NSEvent* pEvent, int& flag)
     else if (pMenuItem->GetSubmenu())
     {
       nsMenuItem = [self addItemWithTitle:nsMenuItemTitle action:nil keyEquivalent:@""];
-      NSMenu* subMenu = [[IGRAPHICS_MENU alloc] initWithIPopupMenuAndReciever:pMenuItem->GetSubmenu() :pView];
+      NSMenu* subMenu = [[IGRAPHICS_MENU alloc] initWithIPopupMenuAndReceiver:pMenuItem->GetSubmenu() :pView];
       [self setSubmenu: subMenu forItem:nsMenuItem];
       [subMenu release];
     }
@@ -204,11 +198,11 @@ static int MacKeyEventToVK(NSEvent* pEvent, int& flag)
       [nsMenuItem setTarget:pView];
     }
     
-    if (!pMenuItem->GetIsSeparator())
+    if (nsMenuItem && !pMenuItem->GetIsSeparator())
     {
       [nsMenuItem setIndentationLevel:pMenuItem->GetIsTitle() ? 1 : 0 ];
       [nsMenuItem setEnabled:pMenuItem->GetEnabled() ? YES : NO];
-      [nsMenuItem setState:pMenuItem->GetChecked() || pMenuItem->GetRadio() ? NSOnState : NSOffState];
+      [nsMenuItem setState:pMenuItem->GetChecked() ? NSOnState : NSOffState];
     }
   }
 
@@ -274,8 +268,14 @@ static int MacKeyEventToVK(NSEvent* pEvent, int& flag)
     // Center that in the proposed rect
     float heightDelta = outRect.size.height - textSize.height;
     
-    outRect.size.height -= heightDelta;
-    outRect.origin.y += (heightDelta / 2);
+    outRect.origin.x += 3;
+    outRect.size.width -= 6;
+    
+    if (heightDelta > 0) 
+    {
+      outRect.size.height -= heightDelta;
+      outRect.origin.y += (heightDelta / 2);
+    }
   }
   
   return outRect;
@@ -377,67 +377,6 @@ static int MacKeyEventToVK(NSEvent* pEvent, int& flag)
 }
 @end
 
-@implementation IGRAPHICS_GLLAYER
-
-- (id) initWithIGraphicsView: (IGRAPHICS_VIEW*) pView;
-{
-  mView = pView;
-  
-  self = [super init];
-  if ( self != nil )
-  {
-    self.needsDisplayOnBoundsChange = YES;
-    self.asynchronous = NO;
-  }
-  
-  return self;
-}
-
-- (NSOpenGLContext*) openGLContextForPixelFormat:(NSOpenGLPixelFormat*) pixelFormat
-{
-  NSOpenGLContext* context = [super openGLContextForPixelFormat: pixelFormat];
-  
-  [context makeCurrentContext];
-  
-  if(!mView->mGraphics->GetDrawContext())
-    mView->mGraphics->ContextReady(self);
-  
-  return context;
-}
-
-- (NSOpenGLPixelFormat*) openGLPixelFormatForDisplayMask: (uint32_t) mask
-{
-  NSOpenGLPixelFormatAttribute profile = NSOpenGLProfileVersionLegacy;
-  #if defined IGRAPHICS_GL3
-    profile = (NSOpenGLPixelFormatAttribute)NSOpenGLProfileVersion3_2Core;
-  #endif
-  
-  const NSOpenGLPixelFormatAttribute kAttributes[] =  {
-    NSOpenGLPFAAccelerated,
-    NSOpenGLPFANoRecovery,
-    NSOpenGLPFADoubleBuffer,
-    NSOpenGLPFAAlphaSize, 8,
-    NSOpenGLPFAColorSize, 24,
-    NSOpenGLPFADepthSize, 0,
-    NSOpenGLPFAStencilSize, 8,
-    NSOpenGLPFAOpenGLProfile, profile,
-    (NSOpenGLPixelFormatAttribute) 0
-  };
-
-  return [[NSOpenGLPixelFormat alloc] initWithAttributes:kAttributes];
-}
-
-//- (BOOL)canDrawInOpenGLContext:(NSOpenGLContext *)context pixelFormat:(NSOpenGLPixelFormat *)pixelFormat forLayerTime:(CFTimeInterval)timeInterval displayTime:(const CVTimeStamp *)timeStamp
-//{
-//}
-
-- (void) drawInOpenGLContext: (NSOpenGLContext*) context pixelFormat: (NSOpenGLPixelFormat*) pixelFormat forLayerTime: (CFTimeInterval) timeInterval displayTime: (const CVTimeStamp*) timeStamp
-{
-  [mView render];
-}
-
-@end
-
 #pragma mark -
 
 extern StaticStorage<CoreTextFontDescriptor> sFontDescriptorCache;
@@ -453,30 +392,131 @@ extern StaticStorage<CoreTextFontDescriptor> sFontDescriptorCache;
   self = [super initWithFrame:r];
   
   mMouseOutDuringDrag = false;
-    
-#if defined IGRAPHICS_NANOVG || defined IGRAPHICS_SKIA
-  if (!self.wantsLayer)
-  {
-    #if defined IGRAPHICS_METAL
-    self.layer = [CAMetalLayer new];
-    [(CAMetalLayer*)[self layer] setPixelFormat:MTLPixelFormatBGRA8Unorm];
-    ((CAMetalLayer*) self.layer).device = MTLCreateSystemDefaultDevice();
-    #elif defined IGRAPHICS_GL
-    self.layer = [[IGRAPHICS_GLLAYER alloc] initWithIGraphicsView:self];
-    self.wantsBestResolutionOpenGLSurface = YES;
-    #endif
-    self.layer.opaque = YES;
-    self.wantsLayer = YES;
-  }
-#endif
+
+  self.wantsLayer = YES;
+  self.layer.opaque = YES;
+  self.layerContentsRedrawPolicy = NSViewLayerContentsRedrawDuringViewResize;
   
   [self registerForDraggedTypes:[NSArray arrayWithObjects: NSFilenamesPboardType, nil]];
+  
+  #if defined IGRAPHICS_METAL
+  self.layer = [CAMetalLayer new];
+  [(CAMetalLayer*)[self layer] setPixelFormat:MTLPixelFormatBGRA8Unorm];
+  ((CAMetalLayer*) self.layer).device = MTLCreateSystemDefaultDevice();
+  
+  #elif defined IGRAPHICS_GL
+  NSOpenGLPixelFormatAttribute profile = NSOpenGLProfileVersionLegacy;
+  #if defined IGRAPHICS_GL3
+    profile = (NSOpenGLPixelFormatAttribute)NSOpenGLProfileVersion3_2Core;
+  #endif
+  const NSOpenGLPixelFormatAttribute attrs[] =  {
+    NSOpenGLPFAAccelerated,
+    NSOpenGLPFANoRecovery,
+    NSOpenGLPFADoubleBuffer,
+    NSOpenGLPFAAlphaSize, 8,
+    NSOpenGLPFAColorSize, 24,
+    NSOpenGLPFADepthSize, 0,
+    NSOpenGLPFAStencilSize, 8,
+    NSOpenGLPFAOpenGLProfile, profile,
+    (NSOpenGLPixelFormatAttribute) 0
+  };
+  NSOpenGLPixelFormat* pPixelFormat = [[NSOpenGLPixelFormat alloc] initWithAttributes:attrs];
+  NSOpenGLContext* pGLContext = [[NSOpenGLContext alloc] initWithFormat:pPixelFormat shareContext:nil];
+  
+  #ifdef DEBUG
+  // CGLEnable([context CGLContextObj], kCGLCECrashOnRemovedFunctions); //SKIA_GL2 will crash
+  #endif
 
-  double sec = 1.0 / (double) pGraphics->FPS();
+  self.pixelFormat = pPixelFormat;
+  self.openGLContext = pGLContext;
+  self.wantsBestResolutionOpenGLSurface = YES;
+  #endif // IGRAPHICS_GL
+
+  #if !defined IGRAPHICS_GL
+  [self setTimer];
+  #endif
+  
+  return self;
+}
+
+#ifdef IGRAPHICS_GL
+- (void) prepareOpenGL
+{
+  [super prepareOpenGL];
+  
+  [[self openGLContext] makeCurrentContext];
+  
+  // Synchronize buffer swaps with vertical refresh rate
+  GLint swapInt = 1;
+  [[self openGLContext] setValues:&swapInt forParameter:NSOpenGLCPSwapInterval];
+  
+  [self setTimer];
+}
+#endif
+
+static CVReturn displayLinkCallback(CVDisplayLinkRef displayLink, const CVTimeStamp* now, const CVTimeStamp* outputTime, CVOptionFlags flagsIn, CVOptionFlags* flagsOut, void* displayLinkContext)
+{
+  dispatch_source_t source = (dispatch_source_t) displayLinkContext;
+  dispatch_source_merge_data(source, 1);
+  
+  return kCVReturnSuccess;
+}
+
+- (void) onTimer: (NSTimer*) pTimer
+{
+  [self render];
+}
+
+- (void) setTimer
+{
+#ifdef IGRAPHICS_CVDISPLAYLINK
+  mDisplaySource = dispatch_source_create(DISPATCH_SOURCE_TYPE_DATA_ADD, 0, 0, dispatch_get_main_queue());
+  dispatch_source_set_event_handler(mDisplaySource, ^(){
+    [self render];
+  });
+  dispatch_resume(mDisplaySource);
+
+  CVReturn cvReturn;
+
+  cvReturn = CVDisplayLinkCreateWithActiveCGDisplays(&mDisplayLink);
+  
+  assert(cvReturn == kCVReturnSuccess);
+
+  cvReturn = CVDisplayLinkSetOutputCallback(mDisplayLink, &displayLinkCallback, (void*) mDisplaySource);
+  assert(cvReturn == kCVReturnSuccess);
+
+  #ifdef IGRAPHICS_GL
+  CGLContextObj cglContext = [[self openGLContext] CGLContextObj];
+  CGLPixelFormatObj cglPixelFormat = [[self pixelFormat] CGLPixelFormatObj];
+  CVDisplayLinkSetCurrentCGDisplayFromOpenGLContext(mDisplayLink, cglContext, cglPixelFormat);
+  #endif
+  
+  CGDirectDisplayID viewDisplayID =
+      (CGDirectDisplayID) [self.window.screen.deviceDescription[@"NSScreenNumber"] unsignedIntegerValue];;
+
+  cvReturn = CVDisplayLinkSetCurrentCGDisplay(mDisplayLink, viewDisplayID);
+
+  assert(cvReturn == kCVReturnSuccess);
+  
+  CVDisplayLinkStart(mDisplayLink);
+#else
+  double sec = 1.0 / (double) mGraphics->FPS();
   mTimer = [NSTimer timerWithTimeInterval:sec target:self selector:@selector(onTimer:) userInfo:nil repeats:YES];
   [[NSRunLoop currentRunLoop] addTimer: mTimer forMode: (NSString*) kCFRunLoopCommonModes];
+#endif
+}
 
-  return self;
+- (void) killTimer
+{
+#ifdef IGRAPHICS_CVDISPLAYLINK
+  CVDisplayLinkStop(mDisplayLink);
+  dispatch_source_cancel(mDisplaySource);
+  CVDisplayLinkRelease(mDisplayLink);
+  mDisplayLink = nil;
+#else
+  [mTimer invalidate];
+  mTimer = nullptr;
+#endif
 }
 
 - (void) dealloc
@@ -491,6 +531,7 @@ extern StaticStorage<CoreTextFontDescriptor> sFontDescriptorCache;
   [super dealloc];
 }
 
+
 - (BOOL) isOpaque
 {
   return mGraphics ? YES : NO;
@@ -499,6 +540,14 @@ extern StaticStorage<CoreTextFontDescriptor> sFontDescriptorCache;
 - (BOOL) isFlipped
 {
   return YES;
+}
+
+- (void) viewDidChangeEffectiveAppearance
+{
+  if (@available(macOS 10.14, *)) {
+    BOOL isDarkMode = [[[self effectiveAppearance] name] isEqualToString: (NSAppearanceNameDarkAqua)];
+    mGraphics->OnAppearanceChanged(isDarkMode ? EUIAppearance::Dark : EUIAppearance::Light);
+  }
 }
 
 - (BOOL) acceptsFirstResponder
@@ -525,11 +574,6 @@ extern StaticStorage<CoreTextFontDescriptor> sFontDescriptorCache;
     if (mGraphics)
       mGraphics->SetScreenScale(newScale);
     
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(windowDidResign:)
-                                                 name:NSWindowDidResignKeyNotification
-                                               object:pWindow];
-    
     #ifdef IGRAPHICS_METAL
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(frameDidChange:)
@@ -548,18 +592,6 @@ extern StaticStorage<CoreTextFontDescriptor> sFontDescriptorCache;
 //    [[NSNotificationCenter defaultCenter] addObserver:self
 //                                             selector:@selector(windowFullscreened:) name:NSWindowDidExitFullScreenNotification
 //                                               object:pWindow];
-    
-    [NSEvent addLocalMonitorForEventsMatchingMask:(NSEventMaskLeftMouseDown |
-      NSEventMaskRightMouseDown | NSEventMaskOtherMouseDown) handler:^(NSEvent *event)
-    {
-      NSPoint pt = [self convertPoint:[event locationInWindow] fromView:nil];
-      if (!NSPointInRect(pt, self.bounds))
-      {
-        if (mGraphics)
-          mGraphics->OnLostFocus();
-      }
-      return event;
-    }];
   }
 }
 
@@ -594,10 +626,10 @@ extern StaticStorage<CoreTextFontDescriptor> sFontDescriptorCache;
 // not called for layer backed views
 - (void) drawRect: (NSRect) bounds
 {
+  #if !defined IGRAPHICS_GL && !defined IGRAPHICS_METAL
   if (mGraphics)
   {
-    if (!mGraphics->GetPlatformContext())
-      mGraphics->SetPlatformContext([self getCGContextRef]);
+    mGraphics->SetPlatformContext([self getCGContextRef]);
       
     if (mGraphics->GetPlatformContext())
     {
@@ -612,20 +644,13 @@ extern StaticStorage<CoreTextFontDescriptor> sFontDescriptorCache;
       mGraphics->Draw(drawRects);
     }
   }
+  #else // this gets called on resize
+  //TODO: set GL context/flush?
+  //mGraphics->Draw(mDirtyRects);
+  #endif
 }
 
 - (void) render
-{
-#if !defined IGRAPHICS_GL && !defined IGRAPHICS_METAL // for layer-backed views setNeedsDisplayInRect/drawRect is not called
-  for (int i = 0; i < mDirtyRects.Size(); i++)
-    [self setNeedsDisplayInRect:ToNSRect(mGraphics, mDirtyRects.Get(i))];
-#else
-  // so just draw on each frame, if something is dirty
-  mGraphics->Draw(mDirtyRects);
-#endif
-}
-
-- (void) onTimer: (NSTimer*) pTimer
 {
   mDirtyRects.Clear();
   
@@ -633,11 +658,19 @@ extern StaticStorage<CoreTextFontDescriptor> sFontDescriptorCache;
   {
     mGraphics->SetAllControlsClean();
       
-#ifdef IGRAPHICS_GL
-    [self.layer setNeedsDisplay];
-#else
-    [self render];
-#endif
+    #if !defined IGRAPHICS_GL && !defined IGRAPHICS_METAL // for layer-backed views setNeedsDisplayInRect/drawRect is not called
+      for (int i = 0; i < mDirtyRects.Size(); i++)
+        [self setNeedsDisplayInRect:ToNSRect(mGraphics, mDirtyRects.Get(i))];
+    #else
+      #ifdef IGRAPHICS_GL
+        [[self openGLContext] makeCurrentContext];
+      #endif
+      // so just draw on each frame, if something is dirty
+      mGraphics->Draw(mDirtyRects);
+    #endif
+    #ifdef IGRAPHICS_GL
+    [[self openGLContext] flushBuffer];
+    #endif
   }
 }
 
@@ -684,7 +717,7 @@ extern StaticStorage<CoreTextFontDescriptor> sFontDescriptorCache;
     [mTrackingArea release];
   }
     
-  int opts = (NSTrackingMouseEnteredAndExited | NSTrackingActiveAlways);
+  int opts = (NSTrackingMouseEnteredAndExited | NSTrackingActiveAlways | NSTrackingEnabledDuringMouseDrag);
   mTrackingArea = [ [NSTrackingArea alloc] initWithRect:[self bounds] options:opts owner:self userInfo:nil];
   [self addTrackingArea:mTrackingArea];
 }
@@ -767,8 +800,15 @@ extern StaticStorage<CoreTextFontDescriptor> sFontDescriptorCache;
   IMouseInfo info = [self getMouseRight:pEvent];
   if (mGraphics)
   {
-    std::vector<IMouseInfo> list {info};
-    mGraphics->OnMouseDown(list);
+    if (([pEvent clickCount] - 1) % 2)
+    {
+      mGraphics->OnMouseDblClick(info.x, info.y, info.ms);
+    }
+    else
+    {
+      std::vector<IMouseInfo> list {info};
+      mGraphics->OnMouseDown(list);
+    }
   }
 }
 
@@ -986,10 +1026,7 @@ static void MakeCursorFromName(NSCursor*& cursor, const char *name)
       break;
     }
     case ECursor::INO: pCursor = [NSCursor operationNotAllowedCursor]; break;
-
     case ECursor::HAND: pCursor = [NSCursor pointingHandCursor]; break;
-    case ECursor::HANDCLOSED: pCursor = [NSCursor closedHandCursor]; break;
-    case ECursor::HANDOPEN: pCursor = [NSCursor openHandCursor]; break;
     case ECursor::APPSTARTING:
       if ([NSCursor respondsToSelector:@selector(busyButClickableCursor)])
         pCursor = [NSCursor performSelector:@selector(busyButClickableCursor)];
@@ -999,7 +1036,6 @@ static void MakeCursorFromName(NSCursor*& cursor, const char *name)
         pCursor = [NSCursor performSelector:@selector(_helpCursor)];
       helpRequested = true;
       break;
-    case ECursor::DRAGNDROP: pCursor = [NSCursor dragCopyCursor]; break;
     default: pCursor = [NSCursor arrowCursor]; break;
   }
 
@@ -1019,27 +1055,6 @@ static void MakeCursorFromName(NSCursor*& cursor, const char *name)
     pCursor = [NSCursor arrowCursor];
 
   [pCursor set];
-}
-
-- (void) killTimer
-{
-  [mTimer invalidate];
-  mTimer = 0;
-}
-
-- (BOOL) resignFirstResponder
-{
-  if (mTimer == nil)
-    return YES;
-  mGraphics->OnLostFocus();
-  return YES;
-}
-
-- (void) windowDidResign: (NSNotification*)notification
-{
-  if (mTimer == nil)
-    return;
-  mGraphics->OnLostFocus();
 }
 
 - (void) removeFromSuperview
@@ -1062,16 +1077,29 @@ static void MakeCursorFromName(NSCursor*& cursor, const char *name)
   mGraphics->SetAllControlsDirty();
 
   [self endUserInput ];
-  [self setNeedsDisplay: YES];
 }
 
 - (IPopupMenu*) createPopupMenu: (IPopupMenu&) menu : (NSRect) bounds;
 {
   IGRAPHICS_MENU_RCVR* pDummyView = [[[IGRAPHICS_MENU_RCVR alloc] initWithFrame:bounds] autorelease];
-  NSMenu* pNSMenu = [[[IGRAPHICS_MENU alloc] initWithIPopupMenuAndReciever:&menu : pDummyView] autorelease];
-  NSPoint wp = {bounds.origin.x, bounds.origin.y + 4};
+  NSMenu* pNSMenu = [[[IGRAPHICS_MENU alloc] initWithIPopupMenuAndReceiver:&menu : pDummyView] autorelease];
+  NSPoint wp = {bounds.origin.x, bounds.origin.y + bounds.size.height + 4};
 
-  [pNSMenu popUpMenuPositioningItem:nil atLocation:wp inView:self];
+  NSMenuItem* pSelectedItem = nil;
+  
+  auto selectedItemIdx = menu.GetChosenItemIdx();
+
+  if (selectedItemIdx > -1)
+  {
+    pSelectedItem = [pNSMenu itemAtIndex:selectedItemIdx];
+  }
+  
+  if (pSelectedItem != nil)
+  {
+    wp = {bounds.origin.x, bounds.origin.y};
+  }
+  
+  [pNSMenu popUpMenuPositioningItem:pSelectedItem atLocation:wp inView:self];
   
   NSMenuItem* pChosenItem = [pDummyView menuItem];
   NSMenu* pChosenMenu = [pChosenItem menu];
@@ -1180,6 +1208,7 @@ static void MakeCursorFromName(NSCursor*& cursor, const char *name)
   [pWindow makeFirstResponder: self];
 
   mTextFieldView = nullptr;
+  mGraphics->ClearInTextEntryControl();
 }
 
 - (BOOL) promptForColor: (IColor&) color : (IColorPickerHandlerFunc) func;
@@ -1227,21 +1256,38 @@ static void MakeCursorFromName(NSCursor*& cursor, const char *name)
 
 - (BOOL) performDragOperation: (id<NSDraggingInfo>) sender
 {
-  NSPasteboard *pPasteBoard = [sender draggingPasteboard];
+  NSPasteboard* pPasteBoard = [sender draggingPasteboard];
 
   if ([[pPasteBoard types] containsObject:NSFilenamesPboardType])
   {
-    NSArray *pFiles = [pPasteBoard propertyListForType:NSFilenamesPboardType];
-    NSString *pFirstFile = [pFiles firstObject];
+    NSArray* pFiles = [pPasteBoard propertyListForType:NSFilenamesPboardType];
     NSPoint point = [sender draggingLocation];
     NSPoint relativePoint = [self convertPoint: point fromView:nil];
     // TODO - fix or remove these values
     float x = relativePoint.x;// - 2.f;
     float y = relativePoint.y;// - 3.f;
-    mGraphics->OnDrop([pFirstFile UTF8String], x, y);
+    if ([pFiles count] == 1)
+    {
+      NSString* pFirstFile = [pFiles firstObject];
+      mGraphics->OnDrop([pFirstFile UTF8String], x, y);
+    }
+    else if ([pFiles count] > 1)
+    {
+      std::vector<const char*> paths([pFiles count]);
+      for (auto i = 0; i < [pFiles count]; i++)
+      {
+        NSString* pFile = [pFiles objectAtIndex: i];
+        paths[i] = [pFile UTF8String];
+      }
+      mGraphics->OnDropMultiple(paths, x, y);
+    }
   }
-
   return YES;
+}
+
+- (NSDragOperation)draggingSession:(NSDraggingSession*) session sourceOperationMaskForDraggingContext:(NSDraggingContext)context
+{
+  return NSDragOperationCopy;
 }
 
 #ifdef IGRAPHICS_METAL
@@ -1254,182 +1300,7 @@ static void MakeCursorFromName(NSCursor*& cursor, const char *name)
 }
 #endif
 
-- (void) attachGestureRecognizer: (EGestureType) type
-{
-  NSGestureRecognizer* gestureRecognizer;
-  
-  switch (type)
-  {
-    case EGestureType::DoubleTap:
-    case EGestureType::TripleTap:
-    {
-      gestureRecognizer = [[NSClickGestureRecognizer alloc] initWithTarget:self action:@selector(onTapGesture:)];
-      [(NSClickGestureRecognizer*) gestureRecognizer setNumberOfClicksRequired: type == EGestureType::DoubleTap ? 2 : 3];
-      //[(NSClickGestureRecognizer*) gestureRecognizer setNumberOfTouchesRequired:1];
-      break;
-    }
-    case EGestureType::LongPress1:
-    case EGestureType::LongPress2:
-    {
-      gestureRecognizer = [[NSPressGestureRecognizer alloc] initWithTarget:self action:@selector(onLongPressGesture:)];
-      //[(NSPressGestureRecognizer*) gestureRecognizer setNumberOfTouchesRequired: type == EGestureType::LongPress1 ? 1 : 2];
-      break;
-    }
-//    case EGestureType::SwipeLeft:
-//    {
-//      gestureRecognizer = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(onSwipeGesture:)];
-//      [(UISwipeGestureRecognizer*) gestureRecognizer setDirection:UISwipeGestureRecognizerDirectionLeft];
-//      break;
-//    }
-//    case EGestureType::SwipeRight:
-//    {
-//      gestureRecognizer = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(onSwipeGesture:)];
-//      [(UISwipeGestureRecognizer*) gestureRecognizer setDirection:UISwipeGestureRecognizerDirectionRight];
-//      break;
-//    }
-//    case EGestureType::SwipeUp:
-//    {
-//      gestureRecognizer = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(onSwipeGesture:)];
-//      [(UISwipeGestureRecognizer*) gestureRecognizer setDirection:UISwipeGestureRecognizerDirectionUp];
-//      break;
-//    }
-//    case EGestureType::SwipeDown:
-//    {
-//      gestureRecognizer = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(onSwipeGesture:)];
-//      [(UISwipeGestureRecognizer*) gestureRecognizer setDirection:UISwipeGestureRecognizerDirectionDown];
-//      break;
-//    }
-    case EGestureType::Pan:
-    {
-      gestureRecognizer = [[NSPanGestureRecognizer alloc] initWithTarget:self action:@selector(onPanGesture:)];
-      break;
-    }
-    case EGestureType::Pinch:
-    {
-      gestureRecognizer = [[NSMagnificationGestureRecognizer alloc] initWithTarget:self action:@selector(onMagnificationGesture:)];
-      break;
-    }
-    case EGestureType::Rotate:
-    {
-      gestureRecognizer = [[NSRotationGestureRecognizer alloc] initWithTarget:self action:@selector(onRotateGesture:)];
-      break;
-    }
-    default:
-      return;
-  }
-  
- // gestureRecognizer.delegate = self;
-//  gestureRecognizer.delaysPrimaryMouseButtonEvents = YES;
-  [self addGestureRecognizer:gestureRecognizer];
-}
-
-- (void) onClickGesture: (NSClickGestureRecognizer*) recognizer
-{
-  CGPoint p = [recognizer locationInView:self];
-  auto ds = mGraphics->GetDrawScale();
-  IGestureInfo info;
-  info.x = p.x / ds;
-  info.y = p.y / ds;
-  info.type = recognizer.numberOfClicksRequired == 2 ? EGestureType::DoubleTap : EGestureType::TripleTap;
-  
-  mGraphics->OnGestureRecognized(info);
-}
-
-- (void) onPressGesture: (NSPressGestureRecognizer*) recognizer
-{
-  CGPoint p = [recognizer locationInView:self];
-  auto ds = mGraphics->GetDrawScale();
-  IGestureInfo info;
-  info.x = p.x / ds;
-  info.y = p.y / ds;
-  if(recognizer.state == NSGestureRecognizerStateBegan)
-    info.state = EGestureState::Began;
-  else if(recognizer.state == NSGestureRecognizerStateChanged)
-    info.state = EGestureState::InProcess;
-  else if(recognizer.state == NSGestureRecognizerStateEnded)
-    info.state = EGestureState::Ended;
-  
-  //info.type = recognizer.numberOfTouchesRequired == 1 ? EGestureType::LongPress1 : EGestureType::LongPress2;
-  
-  mGraphics->OnGestureRecognized(info);
-}
-
-- (void) onPanGesture: (NSPanGestureRecognizer*) recognizer
-{
-  CGPoint p = [recognizer locationInView:self];
-  auto ds = mGraphics->GetDrawScale();
-  IGestureInfo info;
-  info.x = p.x / ds;
-  info.y = p.y / ds;
-/*
-  switch (recognizer.direction) {
-    case UISwipeGestureRecognizerDirectionLeft: info.type = EGestureType::SwipeLeft; break;
-    case UISwipeGestureRecognizerDirectionRight: info.type = EGestureType::SwipeRight; break;
-    case UISwipeGestureRecognizerDirectionUp: info.type = EGestureType::SwipeUp; break;
-    case UISwipeGestureRecognizerDirectionDown: info.type = EGestureType::SwipeDown; break;
-    default:
-      break;
-  }
-  */
-  
-  mGraphics->OnGestureRecognized(info);
-}
-
-- (void) onMagnificationGesture: (NSMagnificationGestureRecognizer*) recognizer
-{
-  CGPoint p = [recognizer locationInView:self];
-  auto ds = mGraphics->GetDrawScale();
-  IGestureInfo info;
-  info.x = p.x / ds;
-  info.y = p.y / ds;
-  info.scale = recognizer.magnification;
-  
-  if(recognizer.state == NSGestureRecognizerStateBegan)
-    info.state = EGestureState::Began;
-  else if(recognizer.state == NSGestureRecognizerStateChanged)
-    info.state = EGestureState::InProcess;
-  else if(recognizer.state == NSGestureRecognizerStateEnded)
-    info.state = EGestureState::Ended;
-  
-  info.type = EGestureType::Pinch;
-  
-  mGraphics->OnGestureRecognized(info);
-}
-
-- (void) onRotateGesture: (NSRotationGestureRecognizer*) recognizer
-{
-  CGPoint p = [recognizer locationInView:self];
-  auto ds = mGraphics->GetDrawScale();
-  IGestureInfo info;
-  info.x = p.x / ds;
-  info.y = p.y / ds;
-  info.angle = RadToDeg(recognizer.rotation);
-  
-  if(recognizer.state == NSGestureRecognizerStateBegan)
-    info.state = EGestureState::Began;
-  else if(recognizer.state == NSGestureRecognizerStateChanged)
-    info.state = EGestureState::InProcess;
-  else if(recognizer.state == NSGestureRecognizerStateEnded)
-    info.state = EGestureState::Ended;
-  
-  info.type = EGestureType::Rotate;
-
-  mGraphics->OnGestureRecognized(info);
-}
-
--(BOOL) gestureRecognizer:(NSGestureRecognizer*) gestureRecognizer shouldReceiveTouch:(NSTouch*) touch
-{
-  CGPoint pos = [touch locationInView:self];
-  
-  auto ds = mGraphics->GetDrawScale();
-
-  if(mGraphics->RespondsToGesture(pos.x / ds, pos.y / ds))
-    return TRUE;
-  else
-    return FALSE;
-}
-
-//- (void)windowResized: (NSNotification *) notification;
+//- (void) windowResized: (NSNotification*) notification;
 //{
 //  if(!mGraphics)
 //    return;
@@ -1467,52 +1338,3 @@ static void MakeCursorFromName(NSCursor*& cursor, const char *name)
 //}
 
 @end
-
-#ifdef IGRAPHICS_IMGUI
-
-@implementation IGRAPHICS_IMGUIVIEW
-{
-}
-
-- (id) initWithIGraphicsView: (IGRAPHICS_VIEW*) pView;
-{
-  mView = pView;
-  self = [super initWithFrame:[pView frame] device: MTLCreateSystemDefaultDevice()];
-  if(self) {
-    _commandQueue = [self.device newCommandQueue];
-    self.layer.opaque = NO;
-  }
-  
-  return self;
-}
-
-- (void) drawRect: (NSRect) dirtyRect
-{
-  id<MTLCommandBuffer> commandBuffer = [self.commandQueue commandBuffer];
-  
-  MTLRenderPassDescriptor *renderPassDescriptor = self.currentRenderPassDescriptor;
-  if (renderPassDescriptor != nil)
-  {
-    renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(0,0,0,0);
-    
-    id <MTLRenderCommandEncoder> renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
-    [renderEncoder pushDebugGroup:@"ImGui IGraphics"];
-    
-    ImGui_ImplMetal_NewFrame(renderPassDescriptor);
-    
-    mView->mGraphics->mImGuiRenderer->DoFrame();
-
-    ImDrawData *drawData = ImGui::GetDrawData();
-    ImGui_ImplMetal_RenderDrawData(drawData, commandBuffer, renderEncoder);
-    
-    [renderEncoder popDebugGroup];
-    [renderEncoder endEncoding];
-    
-    [commandBuffer presentDrawable:self.currentDrawable];
-  }
-  [commandBuffer commit];
-}
-
-@end
-
-#endif

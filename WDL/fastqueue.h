@@ -58,7 +58,30 @@ public:
     m_queue.Empty(true,free);
     m_empties.Empty(true,free);
   }
-  
+
+  void AddInBlocks(const void *buf, int len, int reqbsize)
+  {
+    int pass=0;
+    if (reqbsize<128) reqbsize=128;
+    while (len > 0)
+    {
+      int amt = reqbsize;
+      fqBuf *qb;
+      if (!pass++ && (qb=m_queue.Get(m_queue.GetSize()-1)) && qb->used < qb->alloc_size)
+        amt = qb->alloc_size - qb->used;
+      else 
+      {
+        qb=m_empties.Get(m_empties.GetSize()-1);
+        if (qb) amt = qb->alloc_size;
+      }
+
+      if (amt > len) amt=len;
+      Add(buf,amt);
+      if (buf) buf = (char*)buf + amt;
+      len -= amt;
+    }
+  }
+
   void *Add(const void *buf, int len) // buf can be NULL to add zeroes
   {
     if (len < 1) return NULL;
@@ -208,6 +231,84 @@ public:
     return pos;
   }
 
+  void UnAdd(int len)
+  {
+    len=wdl_clamp(len, 0, m_avail);
+    if (!len) return;
+    m_avail -= len;
+    while (fqBuf *qb=m_queue.Get(m_queue.GetSize()-1))
+    {
+      if (qb->used > len)
+      {
+        qb->used -= len;
+        break;
+      }
+      len -= qb->used;
+      if (m_maxemptieskeep < 0 || m_empties.GetSize() < m_maxemptieskeep)
+      {
+        m_empties.Add(qb);
+      }
+      else
+      {
+        free(qb);
+      }
+      m_queue.Delete(m_queue.GetSize()-1);
+      if (!len) break;
+    }
+  }
+
+  void *PushFront(const void *buf, int len)
+  {
+    fqBuf *qb=NULL;
+    if (m_offs && m_queue.GetSize())
+    {
+      qb=m_queue.Get(0);
+      const int sz=wdl_min(m_offs, len);
+      if (!buf)
+      {
+        memset(qb->data+m_offs-sz, 0, sz);
+      }
+      else if (buf != WDL_FASTQUEUE_ADD_NOZEROBUF)
+      {
+        memcpy(qb->data+m_offs-sz, (unsigned char*)buf+len-sz, sz);
+      }
+      m_offs -= sz;
+      len -= sz;
+      m_avail += sz;
+    }
+    if (len)
+    {
+      const int esz=m_empties.GetSize()-1;
+      qb=m_empties.Get(esz);
+      m_empties.Delete(esz);
+      if (qb && qb->alloc_size < len)
+      {
+        free(qb);
+        qb=NULL;
+      }
+      if (!qb)
+      {
+        const int sz = len < m_bsize ? m_bsize : len;
+        qb=(fqBuf*)malloc(sz+sizeof(fqBuf)-sizeof(qb->data));
+        if (!qb) return NULL;
+        qb->alloc_size=sz;
+      }
+      if (!buf)
+      {
+        memset(qb->data+qb->alloc_size-len, 0, len);
+      }
+      else if (buf != WDL_FASTQUEUE_ADD_NOZEROBUF)
+      {
+        memcpy(qb->data+qb->alloc_size-len, (unsigned char*)buf, len);
+      }
+      qb->used=qb->alloc_size;
+      m_queue.Insert(0, qb);
+      m_offs=qb->used-len;
+      m_avail += len;
+    }
+    return qb ? qb->data+m_offs : NULL;
+  }
+
 private:
 
   WDL_PtrList<fqBuf> m_queue, m_empties;
@@ -217,51 +318,5 @@ private:
   int m_maxemptieskeep;
 } WDL_FIXALIGN;
 
-template <class PTRTYPE> class WDL_TypedFastQueue
-{
-public:
-  WDL_TypedFastQueue(int bsize = 65536 - 64, int maxemptieskeep = -1)
-    : m_q(bsize, (maxemptieskeep > 0) ?
-      maxemptieskeep * sizeof(PTRTYPE) : maxemptieskeep) {}
-
-  ~WDL_TypedFastQueue() {}
-
-  PTRTYPE* Add(const PTRTYPE* buf, int len)
-  {
-    return (PTRTYPE*)m_q.Add((const void*)buf, len * sizeof(PTRTYPE));
-  }
-
-  void Clear(int limitmaxempties = -1)
-  {
-    if (limitmaxempties > 0)
-      limitmaxempties *= sizeof(PTRTYPE);
-    m_q.Clear(limitmaxempties);
-  }
-
-  void Advance(int cnt) { m_q.Advance(cnt * sizeof(PTRTYPE)); }
-
-  int Available() const { return m_q.Available() / sizeof(PTRTYPE); }
-
-  int GetPtr(int offset, PTRTYPE** buf) const
-  {
-    int p = m_q.GetPtr(offset * sizeof(PTRTYPE), (void**)buf);
-    return p / sizeof(PTRTYPE);
-  }
-
-  int SetFromBuf(int offs, PTRTYPE* buf, int len)
-  {
-    int p = m_q.SetFromBuf(offs * sizeof(PTRTYPE), (void*)buf, len * sizeof(PTRTYPE));
-    return p / sizeof(PTRTYPE);
-  }
-
-  int GetToBuf(int offs, PTRTYPE* buf, int len) const
-  {
-    int p = m_q.GetToBuf(offs * sizeof(PTRTYPE), (void*)buf, len * sizeof(PTRTYPE));
-    return p / sizeof(PTRTYPE);
-  }
-
-private:
-  WDL_FastQueue m_q;
-};
 
 #endif //_WDL_FASTQUEUE_H_

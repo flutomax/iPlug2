@@ -32,10 +32,13 @@ IPlugAPIBase::IPlugAPIBase(Config c, EAPI plugAPI)
   mProductName.Set(c.productName, MAX_PLUGIN_NAME_LEN);
   mMfrName.Set(c.mfrName, MAX_PLUGIN_NAME_LEN);
   mHasUI = c.plugHasUI;
+  mHostResize = c.plugHostResize;
   SetEditorSize(c.plugWidth, c.plugHeight);
+  SetSizeConstraints(c.plugMinWidth, c.plugMaxWidth, c.plugMinHeight, c.plugMaxHeight);
   mStateChunks = c.plugDoesChunks;
   mAPI = plugAPI;
   mBundleID.Set(c.bundleID);
+  mAppGroupID.Set(c.appGroupID);
 
   Trace(TRACELOC, "%s:%s", c.pluginName, CurrentTime());
   
@@ -85,19 +88,12 @@ bool IPlugAPIBase::CompareState(const uint8_t* pIncomingState, int startPos) con
   return isEqual;
 }
 
-bool IPlugAPIBase::EditorResize(int viewWidth, int viewHeight)
-{
-  SetEditorSize(viewWidth, viewHeight);
-  return false;
-}
-
-#pragma mark -
-
-void IPlugAPIBase::PrintDebugInfo() const
-{
-  WDL_String buildInfo;
-  GetBuildInfoStr(buildInfo);
-  DBGMSG("\n--------------------------------------------------\n%s\n", buildInfo.Get());
+bool IPlugAPIBase::EditorResizeFromUI(int viewWidth, int viewHeight, bool needsPlatformResize)
+{  
+  if (needsPlatformResize)
+    return EditorResize(viewWidth, viewHeight);
+  else
+    return true;
 }
 
 #pragma mark -
@@ -120,10 +116,8 @@ void IPlugAPIBase::SetHost(const char* host, int version)
 void IPlugAPIBase::SetParameterValue(int idx, double normalizedValue)
 {
   Trace(TRACELOC, "%d:%f", idx, normalizedValue);
-  IParam* param = GetParam(idx);
-  param->SetNormalized(normalizedValue);
-  if (!param->GetHidden())
-    InformHostOfParamChange(idx, normalizedValue);
+  GetParam(idx)->SetNormalized(normalizedValue);
+  InformHostOfParamChange(idx, normalizedValue);
   OnParamChange(idx, kUI);
 }
 
@@ -138,31 +132,46 @@ void IPlugAPIBase::DirtyParametersFromUI()
 
 void IPlugAPIBase::SendParameterValueFromAPI(int paramIdx, double value, bool normalized)
 {
-  if (GetParam(paramIdx)->GetHidden())
-    return;
-  //TODO: Can we assume that no host is stupid enough to try and set parameters on multiple threads at the same time?
-  // If that is the case then we need a MPSPC queue not SPSC
   if (normalized)
     value = GetParam(paramIdx)->FromNormalized(value);
-#ifdef VST2_API
-  SendParameterValueFromDelegate(paramIdx, value, false); // ! ZEF
-#else
-  mParamChangeFromProcessor.Push(ParamTuple{ paramIdx, value });
-  OnParamChange(paramIdx, kHost);
-#endif
+  
+  mParamChangeFromProcessor.Push(ParamTuple { paramIdx, value } );
 }
 
 void IPlugAPIBase::OnTimer(Timer& t)
 {
   if(HasUI())
   {
-    // in distributed VST3, parameter changes are managed by the host
-  #if !defined VST3C_API && !defined VST3P_API // && !defined VST3_API
+// VST3 ********************************************************************************
+#if defined VST3P_API || defined VST3_API
+    while (mMidiMsgsFromProcessor.ElementsAvailable())
+    {
+      IMidiMsg msg;
+      mMidiMsgsFromProcessor.Pop(msg);
+#ifdef VST3P_API // distributed
+      TransmitMidiMsgFromProcessor(msg);
+#else
+      SendMidiMsgFromDelegate(msg);
+#endif
+    }
+
+    while (mSysExDataFromProcessor.ElementsAvailable())
+    {
+      SysExData msg;
+      mSysExDataFromProcessor.Pop(msg);
+#ifdef VST3P_API // distributed
+      TransmitSysExDataFromProcessor(msg);
+#else
+      SendSysexMsgFromDelegate({msg.mOffset, msg.mData, msg.mSize});
+#endif
+    }
+// !VST3 ******************************************************************************
+#else
     while(mParamChangeFromProcessor.ElementsAvailable())
     {
       ParamTuple p;
       mParamChangeFromProcessor.Pop(p);
-      SendParameterValueFromDelegate(p.idx, p.value, false); // TODO:  if the parameter hasn't changed maybe we shouldn't do anything?
+      SendParameterValueFromDelegate(p.idx, p.value, false);
     }
     
     while (mMidiMsgsFromProcessor.ElementsAvailable())
@@ -178,35 +187,10 @@ void IPlugAPIBase::OnTimer(Timer& t)
       mSysExDataFromProcessor.Pop(msg);
       SendSysexMsgFromDelegate({msg.mOffset, msg.mData, msg.mSize});
     }
-  #endif
-    
-    // Midi messages from the processor to the controller, are sent as IMessages and SendMidiMsgFromDelegate gets triggered on the other side's notify
-  #if defined VST3P_API // || defined VST3_API
-    while (mMidiMsgsFromProcessor.ElementsAvailable())
-    {
-      IMidiMsg msg;
-      mMidiMsgsFromProcessor.Pop(msg);
-      TransmitMidiMsgFromProcessor(msg);
-    }
-    
-    while (mSysExDataFromProcessor.ElementsAvailable())
-    {
-      SysExData data;
-      mSysExDataFromProcessor.Pop(data);
-      TransmitSysExDataFromProcessor(data);
-    }
-  #endif
+#endif
   }
   
   OnIdle();
-}
-
-bool IPlugAPIBase::EditorResizeFromUI(int viewWidth, int viewHeight, bool needsPlatformResize)
-{
-  if (needsPlatformResize)
-    return EditorResize(viewWidth, viewHeight);
-  else
-    return true;
 }
 
 void IPlugAPIBase::SendMidiMsgFromUI(const IMidiMsg& msg)

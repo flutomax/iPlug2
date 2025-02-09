@@ -13,7 +13,6 @@
 
 #include "IControl.h"
 #include "IPopupMenuControl.h"
-#include <CoreFoundation/CoreFoundation.h>
 
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
@@ -84,62 +83,61 @@ void IGraphicsMac::CachePlatformFont(const char* fontID, const PlatformFontPtr& 
 
 float IGraphicsMac::MeasureText(const IText& text, const char* str, IRECT& bounds) const
 {
-#ifdef IGRAPHICS_LICE
-  @autoreleasepool
-  {
-    return IGRAPHICS_DRAW_CLASS::MeasureText(text, str, bounds);
-  }
-#else
   return IGRAPHICS_DRAW_CLASS::MeasureText(text, str, bounds);
-#endif
-}
-
-void IGraphicsMac::ContextReady(void* pLayer)
-{
-  OnViewInitialized(pLayer);
-  SetScreenScale([[NSScreen mainScreen] backingScaleFactor]);
-  GetDelegate()->LayoutUI(this);
-  UpdateTooltips();
-  GetDelegate()->OnUIOpen();
 }
 
 void* IGraphicsMac::OpenWindow(void* pParent)
 {
   TRACE
   CloseWindow();
-  mView = (IGRAPHICS_VIEW*) [[IGRAPHICS_VIEW alloc] initWithIGraphics: this];
-  
-#ifndef IGRAPHICS_GL // with OpenGL, we don't get given the glcontext until later, ContextReady will get called elsewhere
-  IGRAPHICS_VIEW* pView = (IGRAPHICS_VIEW*) mView;
-  ContextReady([pView layer]);
+  IGRAPHICS_VIEW* pView = [[IGRAPHICS_VIEW alloc] initWithIGraphics: this];
+  mView = (void*) pView;
+    
+#ifdef IGRAPHICS_GL
+  [[pView openGLContext] makeCurrentContext];
 #endif
+    
+  OnViewInitialized([pView layer]);
+  SetScreenScale([[NSScreen mainScreen] backingScaleFactor]);
+  GetDelegate()->LayoutUI(this);
+  UpdateTooltips();
+  GetDelegate()->OnUIOpen();
   
   if (pParent)
   {
-    [(NSView*) pParent addSubview: (IGRAPHICS_VIEW*) mView];
+    [(NSView*) pParent addSubview: pView];
   }
 
   return mView;
 }
 
+void IGraphicsMac::AttachPlatformView(const IRECT& r, void* pView)
+{
+  NSView* pNewSubView = (NSView*) pView;
+  [pNewSubView setFrame:ToNSRect(this, r)];
+  
+  [(IGRAPHICS_VIEW*) mView addSubview:(NSView*) pNewSubView];
+}
+
+void IGraphicsMac::RemovePlatformView(void* pView)
+{
+  [(NSView*) pView removeFromSuperview];
+}
+
+void IGraphicsMac::HidePlatformView(void* pView, bool hide)
+{
+  [(NSView*) pView setHidden:hide];
+}
+
 void IGraphicsMac::CloseWindow()
 {
   if (mView)
-  {
-#ifdef IGRAPHICS_IMGUI
-    if(mImGuiView)
-    {
-      IGRAPHICS_IMGUIVIEW* pImGuiView = (IGRAPHICS_IMGUIVIEW*) mImGuiView;
-      [pImGuiView removeFromSuperview];
-      [pImGuiView release];
-      mImGuiView = nullptr;
-    }
-#endif
-    
+  {    
     IGRAPHICS_VIEW* pView = (IGRAPHICS_VIEW*) mView;
       
 #ifdef IGRAPHICS_GL
-    [((IGRAPHICS_GLLAYER *)pView.layer).openGLContext makeCurrentContext];
+    [[pView pixelFormat] release];
+    [[pView openGLContext] release];
 #endif
       
     [pView removeAllToolTips];
@@ -157,12 +155,6 @@ bool IGraphicsMac::WindowIsOpen()
   return mView;
 }
 
-void IGraphicsMac::AttachGestureRecognizer(EGestureType type)
-{
-  IGraphics::AttachGestureRecognizer(type);
-  [(IGRAPHICS_VIEW*) mView attachGestureRecognizer:type];
-}
-
 void IGraphicsMac::PlatformResize(bool parentHasResized)
 {
   if (mView)
@@ -173,13 +165,10 @@ void IGraphicsMac::PlatformResize(bool parentHasResized)
     [[NSAnimationContext currentContext] setDuration:0.0];
     [(IGRAPHICS_VIEW*) mView setFrameSize: size ];
     
-#ifdef IGRAPHICS_IMGUI
-    if(mImGuiView)
-      [(IGRAPHICS_IMGUIVIEW*) mImGuiView setFrameSize: size ];
-#endif
-    
     [NSAnimationContext endGrouping];
-  }  
+  }
+    
+  UpdateTooltips();
 }
 
 void IGraphicsMac::PointToScreen(float& x, float& y) const
@@ -212,22 +201,29 @@ void IGraphicsMac::ScreenToPoint(float& x, float& y) const
 
 void IGraphicsMac::HideMouseCursor(bool hide, bool lock)
 {
-  if (mCursorHidden == hide)
-    return;
-  
-  mCursorHidden = hide;
-  
-  if (hide)
+#if defined AU_API
+  if (!IsXPCAuHost())
+#elif defined AUv3_API
+  if (!IsOOPAuv3AppExtension())
+#endif
   {
-    StoreCursorPosition();
-    CGDisplayHideCursor(kCGDirectMainDisplay);
-    mCursorLock = lock;
-  }
-  else
-  {
-    DoCursorLock(mCursorX, mCursorY, mCursorX, mCursorY);
-    CGDisplayShowCursor(kCGDirectMainDisplay);
-    mCursorLock = false;
+    if (mCursorHidden == hide)
+      return;
+    
+    mCursorHidden = hide;
+    
+    if (hide)
+    {
+      StoreCursorPosition();
+      CGDisplayHideCursor(kCGDirectMainDisplay);
+      mCursorLock = lock;
+    }
+    else
+    {
+      DoCursorLock(mCursorX, mCursorY, mCursorX, mCursorY);
+      CGDisplayShowCursor(kCGDirectMainDisplay);
+      mCursorLock = false;
+    }
   }
 }
 
@@ -287,153 +283,79 @@ void IGraphicsMac::GetMouseLocation(float& x, float&y) const
   ScreenToPoint(x, y);
 }
 
-EMsgBoxResult IGraphicsMac::ShowMessageBox(const char* str, const char* caption, EMsgBoxType type, EMsgBoxIcon icon,IMsgBoxCompletionHanderFunc completionHandler)
+EMsgBoxResult IGraphicsMac::ShowMessageBox(const char* str, const char* title, EMsgBoxType type, IMsgBoxCompletionHandlerFunc completionHandler)
 {
   ReleaseMouseCapture();
 
-  long result = (long) kCANCEL;
+  NSString* messageContent = @(str ? str : "");
+  NSString* alertTitle = @(title ? title : "");
   
-  if (!str) str= "";
-  if (!caption) caption= "";
+  NSAlert* alert = [[NSAlert alloc] init];
+  [alert setMessageText:alertTitle];
+  [alert setInformativeText:messageContent];
   
-  //convert the strings from char* to CFStringRef
-  CFStringRef header_ref = CFStringCreateWithCString(NULL, caption, kCFStringEncodingUTF8);
-  CFStringRef message_ref = CFStringCreateWithCString( NULL, str, kCFStringEncodingUTF8);
-  
-  CFOptionFlags flgresult, icont;  //result code from the message box
-  switch (icon)
-  {
-    case kMB_ICONHAND:
-      icont = kCFUserNotificationStopAlertLevel;
-      break;
-    case kMB_ICONEXCLAMATION:
-      icont = kCFUserNotificationCautionAlertLevel;
-      break;
-    default:
-      icont = kCFUserNotificationPlainAlertLevel;
-      break;
-  }
-  
+  EMsgBoxResult result = kCANCEL;
   
   switch (type)
   {
     case kMB_OK:
-      CFUserNotificationDisplayAlert(
-                                     0, // no timeout
-                                     icont, //change it depending message_type flags ( MB_ICONASTERISK.... etc.)
-                                     NULL, //icon url, use default, you can change it depending message_type flags
-                                     NULL, //not used
-                                     NULL, //localization of strings
-                                     header_ref, //header text
-                                     message_ref, //message text
-                                     CFSTR("OK"), //default "ok" text in button
-                                     NULL, //alternate button title
-                                     NULL, //other button title, null--> no other button
-                                     &flgresult //response flags
-                                     );
+      [alert addButtonWithTitle:@"OK"];
       result = kOK;
       break;
     case kMB_OKCANCEL:
-      
-      CFUserNotificationDisplayAlert(
-                                      0, // no timeout
-                                      icont, //change it depending message_type flags ( MB_ICONASTERISK.... etc.)
-                                      NULL, //icon url, use default, you can change it depending message_type flags
-                                      NULL, //not used
-                                      NULL, //localization of strings
-                                      header_ref, //header text
-                                      message_ref, //message text
-                                      CFSTR("OK"), //default "ok" text in button
-                                      CFSTR("Cancel"), //alternate button title
-                                      NULL, //other button title, null--> no other button
-                                      &flgresult //response flags
-                                      );
-      if (flgresult == kCFUserNotificationDefaultResponse )
-        result = kOK;
-      else
-        result = kCANCEL;
+      [alert addButtonWithTitle:@"OK"];
+      [alert addButtonWithTitle:@"Cancel"];
+      result = kCANCEL;
       break;
     case kMB_YESNO:
-      CFUserNotificationDisplayAlert(
-                                      0, // no timeout
-                                      icont, //change it depending message_type flags ( MB_ICONASTERISK.... etc.)
-                                      NULL, //icon url, use default, you can change it depending message_type flags
-                                      NULL, //not used
-                                      NULL, //localization of strings
-                                      header_ref, //header text
-                                      message_ref, //message text
-                                      CFSTR("Yes"), //default "ok" text in button
-                                      CFSTR("No"), //alternate button title
-                                      NULL, //other button title, null--> no other button
-                                      &flgresult //response flags
-                                      );
-      if (flgresult == kCFUserNotificationDefaultResponse )
-        result = kYES;
-      else
-        result = kNO;
+      [alert addButtonWithTitle:@"Yes"];
+      [alert addButtonWithTitle:@"No"];
+      result = kNO;
       break;
     case kMB_RETRYCANCEL:
-      CFUserNotificationDisplayAlert(
-                                      0, // no timeout
-                                      icont, //change it depending message_type flags ( MB_ICONASTERISK.... etc.)
-                                      NULL, //icon url, use default, you can change it depending message_type flags
-                                      NULL, //not used
-                                      NULL, //localization of strings
-                                      header_ref, //header text
-                                      message_ref, //message text
-                                      CFSTR("Retry"), //default "ok" text in button
-                                      CFSTR("Cancel"), //alternate button title
-                                      NULL, //other button title, null--> no other button
-                                      &flgresult //response flags
-                                      );
-      if (flgresult == kCFUserNotificationDefaultResponse )
-        result = kRETRY;
-      else
-        result = kCANCEL;
+      [alert addButtonWithTitle:@"Retry"];
+      [alert addButtonWithTitle:@"Cancel"];
+      result = kCANCEL;
       break;
     case kMB_YESNOCANCEL:
-      CFUserNotificationDisplayAlert(
-                                      0, // no timeout
-                                      icont, //change it depending message_type flags ( MB_ICONASTERISK.... etc.)
-                                      NULL, //icon url, use default, you can change it depending message_type flags
-                                      NULL, //not used
-                                      NULL, //localization of strings
-                                      header_ref, //header text
-                                      message_ref, //message text
-                                      CFSTR("Yes"), //default "ok" text in button
-                                      CFSTR("No"), //alternate button title
-                                      CFSTR("Cancel"), //other button title, null--> no other button
-                                      &flgresult //response flags
-                                      );
-      switch (flgresult)
-      {
-        case kCFUserNotificationDefaultResponse:
-          result = kYES;
-          break;
-        case kCFUserNotificationAlternateResponse:
-          result = kNO;
-          break;
-        default:
-          result = kCANCEL;
-          break;
-      }
+      [alert addButtonWithTitle:@"Yes"];
+      [alert addButtonWithTitle:@"No"];
+      [alert addButtonWithTitle:@"Cancel"];
+      result = kCANCEL;
       break;
   }
   
-  //launch the message box
+  NSModalResponse response = [alert runModal];
   
+  switch (type)
+  {
+    case kMB_OK:
+      result = kOK;
+      break;
+    case kMB_OKCANCEL:
+      result = (response == NSAlertFirstButtonReturn) ? kOK : kCANCEL;
+      break;
+    case kMB_YESNO:
+      result = (response == NSAlertFirstButtonReturn) ? kYES : kNO;
+      break;
+    case kMB_RETRYCANCEL:
+      result = (response == NSAlertFirstButtonReturn) ? kRETRY : kCANCEL;
+      break;
+    case kMB_YESNOCANCEL:
+      if (response == NSAlertFirstButtonReturn) result = kYES;
+      else if (response == NSAlertSecondButtonReturn) result = kNO;
+      else result = kCANCEL;
+      break;
+  }
   
-  //Clean up the strings
-  CFRelease( header_ref );
-  CFRelease( message_ref );
+  if (completionHandler)
+  {
+    completionHandler(result);
+  }
   
-  //Convert the result
+  [alert release];
   
-  
-  if(completionHandler)
-    completionHandler(static_cast<EMsgBoxResult>(result));
-  
-  return static_cast<EMsgBoxResult>(result);
+  return result;
 }
 
 void IGraphicsMac::ForceEndUserEdit()
@@ -458,11 +380,11 @@ void IGraphicsMac::UpdateTooltips()
     return;
   }
 
-  auto func = [this](IControl& control)
+  auto func = [this](IControl* pControl)
   {
-    if (control.GetTooltip() && !control.IsHidden())
+    if (pControl->GetTooltip() && !pControl->IsHidden())
     {
-      IRECT pR = control.GetTargetRECT();
+      IRECT pR = pControl->GetTargetRECT();
       if (!pR.Empty())
       {
         [(IGRAPHICS_VIEW*) mView registerToolTip: pR];
@@ -515,7 +437,7 @@ bool IGraphicsMac::RevealPathInExplorerOrFinder(WDL_String& path, bool select)
   return (bool) success;
 }
 
-void IGraphicsMac::PromptForFile(WDL_String& fileName, WDL_String& path, EFileAction action, const char* ext)
+void IGraphicsMac::PromptForFile(WDL_String& fileName, WDL_String& path, EFileAction action, const char* ext, IFileDialogCompletionHandlerFunc completionHandler)
 {
   if (!WindowIsOpen())
   {
@@ -523,78 +445,84 @@ void IGraphicsMac::PromptForFile(WDL_String& fileName, WDL_String& path, EFileAc
     return;
   }
 
-  NSString* pDefaultFileName;
-  NSString* pDefaultPath;
+  NSString* pDefaultFileName = nil;
+  NSString* pDefaultPath = nil;
   NSArray* pFileTypes = nil;
 
   if (fileName.GetLength())
     pDefaultFileName = [NSString stringWithCString:fileName.Get() encoding:NSUTF8StringEncoding];
   else
-    pDefaultFileName = [NSString stringWithCString:"" encoding:NSUTF8StringEncoding];
-
-  if(!path.GetLength())
-    DesktopPath(path);
-
-  pDefaultPath = [NSString stringWithCString:path.Get() encoding:NSUTF8StringEncoding];
+    pDefaultFileName = @"";
+  
+  if (path.GetLength())
+    pDefaultPath = [NSString stringWithCString:path.Get() encoding:NSUTF8StringEncoding];
+  else
+    pDefaultPath = @"";
 
   fileName.Set(""); // reset it
 
   if (CStringHasContents(ext))
     pFileTypes = [[NSString stringWithUTF8String:ext] componentsSeparatedByString: @" "];
-
-  if (action == EFileAction::Save)
-  {
-    NSSavePanel* pSavePanel = [NSSavePanel savePanel];
-
-    //[panelOpen setTitle:title];
-    [pSavePanel setAllowedFileTypes: pFileTypes];
-    [pSavePanel setAllowsOtherFileTypes: NO];
-
-    long result = [pSavePanel runModalForDirectory:pDefaultPath file:pDefaultFileName];
-
-    if (result == NSOKButton)
+  
+  auto doHandleResponse = [](NSPanel* pPanel, NSModalResponse response, WDL_String& fileName, WDL_String& path, IFileDialogCompletionHandlerFunc completionHandler){
+    if (response == NSOKButton)
     {
-      NSString* pFullPath = [pSavePanel filename] ;
+      NSString* pFullPath = [(NSSavePanel*) pPanel filename] ;
       fileName.Set([pFullPath UTF8String]);
-
+      
       NSString* pTruncatedPath = [pFullPath stringByDeletingLastPathComponent];
-
+      
       if (pTruncatedPath)
       {
         path.Set([pTruncatedPath UTF8String]);
         path.Append("/");
       }
     }
+  
+    if (completionHandler)
+      completionHandler(fileName, path);
+  };
+  
+  NSPanel* pPanel = nullptr;
+  
+  if (action == EFileAction::Save)
+  {
+    pPanel = [NSSavePanel savePanel];
+    
+    [(NSSavePanel*) pPanel setAllowedFileTypes: pFileTypes];
+    [(NSSavePanel*) pPanel setDirectoryURL: [NSURL fileURLWithPath: pDefaultPath]];
+    [(NSSavePanel*) pPanel setNameFieldStringValue: pDefaultFileName];
+    [(NSSavePanel*) pPanel setAllowsOtherFileTypes: NO];
   }
   else
   {
-    NSOpenPanel* pOpenPanel = [NSOpenPanel openPanel];
+    pPanel = [NSOpenPanel openPanel];
+    
+    [(NSOpenPanel*) pPanel setAllowedFileTypes: pFileTypes];
+    [(NSOpenPanel*) pPanel setDirectoryURL: [NSURL fileURLWithPath: pDefaultPath]];
+    [(NSOpenPanel*) pPanel setCanChooseFiles:YES];
+    [(NSOpenPanel*) pPanel setCanChooseDirectories:NO];
+    [(NSOpenPanel*) pPanel setResolvesAliases:YES];
+  }
+  [pPanel setFloatingPanel: YES];
+  
+  if (completionHandler)
+  {
+    NSWindow* pWindow = [(IGRAPHICS_VIEW*) mView window];
 
-    //[pOpenPanel setTitle:title];
-    //[pOpenPanel setAllowsMultipleSelection:(allowmul?YES:NO)];
-    [pOpenPanel setCanChooseFiles:YES];
-    [pOpenPanel setCanChooseDirectories:NO];
-    [pOpenPanel setResolvesAliases:YES];
-
-    long result = [pOpenPanel runModalForDirectory:pDefaultPath file:pDefaultFileName types:pFileTypes];
-
-    if (result == NSOKButton)
-    {
-      NSString* pFullPath = [pOpenPanel filename] ;
-      fileName.Set([pFullPath UTF8String]);
-
-      NSString* pTruncatedPath = [pFullPath stringByDeletingLastPathComponent];
-
-      if (pTruncatedPath)
-      {
-        path.Set([pTruncatedPath UTF8String]);
-        path.Append("/");
-      }
-    }
+    [(NSSavePanel*) pPanel beginSheetModalForWindow:pWindow completionHandler:^(NSModalResponse response) {
+      WDL_String fileNameAsync, pathAsync;
+      doHandleResponse(pPanel, response, fileNameAsync, pathAsync, completionHandler);
+    }];
+  }
+  else
+  {
+    NSModalResponse response = [(NSSavePanel*) pPanel runModal];
+    doHandleResponse(pPanel, response, fileName, path, nullptr);
   }
 }
 
-void IGraphicsMac::PromptForDirectory(WDL_String& dir)
+void IGraphicsMac::PromptForDirectory(WDL_String& dir, IFileDialogCompletionHandlerFunc completionHandler)
 {
   NSString* defaultPath;
 
@@ -615,18 +543,41 @@ void IGraphicsMac::PromptForDirectory(WDL_String& dir)
   [panelOpen setCanChooseDirectories:YES];
   [panelOpen setResolvesAliases:YES];
   [panelOpen setCanCreateDirectories:YES];
-
+  [panelOpen setFloatingPanel: YES];
   [panelOpen setDirectoryURL: [NSURL fileURLWithPath: defaultPath]];
+  
+  auto doHandleResponse = [](NSOpenPanel* pPanel, NSModalResponse response, WDL_String& pathAsync, IFileDialogCompletionHandlerFunc completionHandler){
+    if (response == NSOKButton)
+    {
+      NSString* fullPath = [pPanel filename] ;
+      pathAsync.Set([fullPath UTF8String]);
+      pathAsync.Append("/");
+    }
+    else
+    {
+      pathAsync.Set("");
+    }
+    
+    if (completionHandler)
+    {
+      WDL_String fileNameAsync; // not used
+      completionHandler(fileNameAsync, pathAsync);
+    }
+  };
 
-  if ([panelOpen runModal] == NSOKButton)
+  if (completionHandler)
   {
-    NSString* fullPath = [ panelOpen filename ] ;
-    dir.Set( [fullPath UTF8String] );
-    dir.Append("/");
+    NSWindow* pWindow = [(IGRAPHICS_VIEW*) mView window];
+
+    [panelOpen beginSheetModalForWindow:pWindow completionHandler:^(NSModalResponse response) {
+      WDL_String pathAsync;
+      doHandleResponse(panelOpen, response, pathAsync, completionHandler);
+    }];
   }
   else
   {
-    dir.Set("");
+    NSModalResponse response = [panelOpen runModal];
+    doHandleResponse(panelOpen, response, dir, nullptr);
   }
 }
 
@@ -638,21 +589,26 @@ bool IGraphicsMac::PromptForColor(IColor& color, const char* str, IColorPickerHa
   return false;
 }
 
-IPopupMenu* IGraphicsMac::CreatePlatformPopupMenu(IPopupMenu& menu, const IRECT& bounds, bool& isAsync)
+IPopupMenu* IGraphicsMac::CreatePlatformPopupMenu(IPopupMenu& menu, const IRECT bounds, bool& isAsync)
 {
-  IPopupMenu* pReturnMenu = nullptr;
+  isAsync = true;
+  
+  dispatch_async(dispatch_get_main_queue(), ^{
+    IPopupMenu* pReturnMenu = nullptr;
 
-  if (mView)
-  {
-    NSRect areaRect = ToNSRect(this, bounds);
-    pReturnMenu = [(IGRAPHICS_VIEW*) mView createPopupMenu: menu: areaRect];
-  }
+    if (mView)
+    {
+      NSRect areaRect = ToNSRect(this, bounds);
+      pReturnMenu = [(IGRAPHICS_VIEW*) mView createPopupMenu: menu: areaRect];
+    }
 
-  //synchronous
-  if(pReturnMenu && pReturnMenu->GetFunction())
-    pReturnMenu->ExecFunction();
+    if (pReturnMenu && pReturnMenu->GetFunction())
+      pReturnMenu->ExecFunction();
+    
+    this->SetControlValueAfterPopupMenu(pReturnMenu);
+  });
 
-  return pReturnMenu;
+  return nullptr;
 }
 
 void IGraphicsMac::CreatePlatformTextEntry(int paramIdx, const IText& text, const IRECT& bounds, int length, const char* str)
@@ -724,30 +680,55 @@ bool IGraphicsMac::SetTextInClipboard(const char* str)
   return [[NSPasteboard generalPasteboard] setString:pTextForClipboard forType:NSStringPboardType];
 }
 
-void IGraphicsMac::CreatePlatformImGui()
+bool IGraphicsMac::SetFilePathInClipboard(const char* path)
 {
-#ifdef IGRAPHICS_IMGUI
-  if(mView)
-  {
-    IGRAPHICS_VIEW* pView = (IGRAPHICS_VIEW*) mView;
-    
-    IGRAPHICS_IMGUIVIEW* pImGuiView = [[IGRAPHICS_IMGUIVIEW alloc] initWithIGraphicsView:pView];
-    [pView addSubview: pImGuiView];
-    mImGuiView = pImGuiView;
-  }
-#endif
+  NSPasteboard* pPasteboard = [NSPasteboard generalPasteboard];
+  [pPasteboard clearContents]; // clear pasteboard to take ownership
+  NSURL* pFileURL = [NSURL fileURLWithPath: [NSString stringWithUTF8String: path]];
+  BOOL success = [pPasteboard writeObjects: [NSArray arrayWithObject:pFileURL]];
+  return (bool)success;
 }
 
-#ifdef IGRAPHICS_AGG
-  #include "IGraphicsAGG.cpp"
-#elif defined IGRAPHICS_CAIRO
-  #include "IGraphicsCairo.cpp"
-#elif defined IGRAPHICS_NANOVG
+bool IGraphicsMac::InitiateExternalFileDragDrop(const char* path, const IRECT& iconBounds)
+{
+  NSPasteboardItem* pasteboardItem = [[NSPasteboardItem alloc] init];
+  NSURL* fileURL = [NSURL fileURLWithPath: [NSString stringWithUTF8String: path]];
+  [pasteboardItem setString:fileURL.absoluteString forType:NSPasteboardTypeFileURL];
+  
+  NSDraggingItem* draggingItem = [[NSDraggingItem alloc] initWithPasteboardWriter:pasteboardItem];
+  NSRect draggingFrame = ToNSRect(this, iconBounds);
+  NSImage* iconImage = [[NSWorkspace sharedWorkspace] iconForFile:fileURL.path];
+  [iconImage setSize:NSMakeSize(64, 64)];
+  [draggingItem setDraggingFrame:draggingFrame contents: iconImage];
+  
+  IGRAPHICS_VIEW* view = (IGRAPHICS_VIEW*) mView;
+  NSDraggingSession* draggingSession = [view beginDraggingSessionWithItems:@[draggingItem] event:[NSApp currentEvent] source: view];
+  draggingSession.animatesToStartingPositionsOnCancelOrFail = YES;
+  draggingSession.draggingFormation = NSDraggingFormationNone;
+  
+  ReleaseMouseCapture();
+  
+  return true;
+}
+
+EUIAppearance IGraphicsMac::GetUIAppearance() const
+{
+  if (@available(macOS 10.14, *)) {
+    if(mView)
+    {
+      IGRAPHICS_VIEW* pView = (IGRAPHICS_VIEW*) mView;
+      BOOL isDarkMode = [[[pView effectiveAppearance] name] isEqualToString: (NSAppearanceNameDarkAqua)];
+      return isDarkMode ? EUIAppearance::Dark :  EUIAppearance::Light;
+    }
+  }
+  
+  return EUIAppearance::Light;
+}
+
+#if defined IGRAPHICS_NANOVG
   #include "IGraphicsNanoVG.cpp"
 #elif defined IGRAPHICS_SKIA
   #include "IGraphicsSkia.cpp"
-#elif defined IGRAPHICS_LICE
-  #include "IGraphicsLice.cpp"
 #else
   #error Either NO_IGRAPHICS or one and only one choice of graphics library must be defined!
 #endif

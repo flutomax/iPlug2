@@ -10,6 +10,7 @@
 
 #import <QuartzCore/QuartzCore.h>
 #import <MetalKit/MetalKit.h>
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
 #include "IGraphicsIOS.h"
 #include "IGraphicsCoreText.h"
@@ -18,6 +19,7 @@
 
 #include <map>
 #include <string>
+#include <cassert>
 
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
@@ -29,6 +31,13 @@ void GetScreenDimensions(int& width, int& height)
   CGRect bounds = [[UIScreen mainScreen] bounds];
   width = bounds.size.width;
   height = bounds.size.height;
+}
+
+float GetScaleForScreen(int plugWidth, int plugHeight)
+{
+  int width, height;
+  GetScreenDimensions(width, height);
+  return std::min((float) width / (float) plugWidth, (float) height / (float) plugHeight);
 }
 
 END_IGRAPHICS_NAMESPACE
@@ -48,12 +57,12 @@ IGraphicsIOS::IGraphicsIOS(IGEditorDelegate& dlg, int w, int h, int fps, float s
 : IGRAPHICS_DRAW_CLASS(dlg, w, h, fps, scale)
 {
  
-#ifdef IGRAPHICS_METAL
+#if defined IGRAPHICS_METAL && !defined IGRAPHICS_SKIA
   if(!gTextureMap.size())
   {
     NSBundle* pBundle = [NSBundle mainBundle];
 
-    if(IsAuv3AppExtension())
+    if(IsOOPAuv3AppExtension())
       pBundle = [NSBundle bundleWithPath: [[[pBundle bundlePath] stringByDeletingLastPathComponent] stringByDeletingLastPathComponent]];
     
     NSArray<NSURL*>* pTextureFiles = [pBundle URLsForResourcesWithExtension:@"ktx" subdirectory:@""];
@@ -72,7 +81,7 @@ IGraphicsIOS::IGraphicsIOS(IGEditorDelegate& dlg, int w, int h, int fps, float s
         gTextureMap.insert(std::make_pair([[[pTextureFiles[i] lastPathComponent] stringByDeletingPathExtension] cStringUsingEncoding:NSUTF8StringEncoding], (MTLTexturePtr) gTextures[i]));
       }
     
-      DBGMSG("Preloaded %i textures", (int) [pTextureFiles count]);
+      DBGMSG("Preloaded %i textures\n", (int) [pTextureFiles count]);
     
       [textureLoader release];
       textureLoader = nil;
@@ -113,17 +122,7 @@ void* IGraphicsIOS::OpenWindow(void* pParent)
 void IGraphicsIOS::CloseWindow()
 {
   if (mView)
-  {
-#ifdef IGRAPHICS_IMGUI
-    if(mImGuiView)
-    {
-      IGRAPHICS_IMGUIVIEW* pImGuiView = (IGRAPHICS_IMGUIVIEW*) mImGuiView;
-      [pImGuiView removeFromSuperview];
-      [pImGuiView release];
-      mImGuiView = nullptr;
-    }
-#endif
-    
+  { 
     IGRAPHICS_VIEW* pView = (IGRAPHICS_VIEW*) mView;
     [pView removeFromSuperview];
     [pView release];
@@ -142,14 +141,35 @@ void IGraphicsIOS::PlatformResize(bool parentHasResized)
 {
   if (mView)
   {
-    //TODO
+    CGRect r = CGRectMake(0., 0., static_cast<CGFloat>(WindowWidth()), static_cast<CGFloat>(WindowHeight()));
+    [(IGRAPHICS_VIEW*) mView setFrame: r ];
   }
 }
 
-EMsgBoxResult IGraphicsIOS::ShowMessageBox(const char* str, const char* caption, EMsgBoxType type, IMsgBoxCompletionHanderFunc completionHandler)
+void IGraphicsIOS::AttachPlatformView(const IRECT& r, void* pView)
+{
+  IGRAPHICS_VIEW* pMainView = (IGRAPHICS_VIEW*) mView;
+  
+  UIView* pNewSubView = (UIView*) pView;
+  [pNewSubView setFrame:ToCGRect(this, r)];
+
+  [pMainView addSubview:pNewSubView];
+}
+
+void IGraphicsIOS::RemovePlatformView(void* pView)
+{
+  [(UIView*) pView removeFromSuperview];
+}
+
+void IGraphicsIOS::HidePlatformView(void* pView, bool hide)
+{
+  [(UIView*) pView setHidden:hide];
+}
+
+EMsgBoxResult IGraphicsIOS::ShowMessageBox(const char* str, const char* title, EMsgBoxType type, IMsgBoxCompletionHandlerFunc completionHandler)
 {
   ReleaseMouseCapture();
-  [(IGRAPHICS_VIEW*) mView showMessageBox:str :caption :type :completionHandler];
+  [(IGRAPHICS_VIEW*) mView showMessageBox:str : title : type : completionHandler];
   return EMsgBoxResult::kNoResult; // we need to rely on completionHandler
 }
 
@@ -172,20 +192,70 @@ const char* IGraphicsIOS::GetPlatformAPIStr()
   return "iOS";
 }
 
-void IGraphicsIOS::PromptForFile(WDL_String& fileName, WDL_String& path, EFileAction action, const char* ext)
+void IGraphicsIOS::GetMouseLocation(float& x, float&y) const
 {
+  [(IGRAPHICS_VIEW*) mView getLastTouchLocation: x : y];
 }
 
-void IGraphicsIOS::PromptForDirectory(WDL_String& dir)
+void IGraphicsIOS::PromptForFile(WDL_String& fileName, WDL_String& path, EFileAction action, const char* ext, IFileDialogCompletionHandlerFunc completionHandler)
 {
+  assert(completionHandler != nullptr && "You must provide a completion handler on iOS");
+  
+  NSString* pDefaultFileName = nil;
+  NSString* pDefaultPath = nil;
+  NSMutableArray* pFileTypes = [[NSMutableArray alloc] init];
+
+  if (fileName.GetLength())
+    pDefaultFileName = [NSString stringWithCString:fileName.Get() encoding:NSUTF8StringEncoding];
+  else
+    pDefaultFileName = @"";
+  
+  if (path.GetLength())
+    pDefaultPath = [NSString stringWithCString:path.Get() encoding:NSUTF8StringEncoding];
+  else
+    pDefaultPath = @"";
+
+  fileName.Set(""); // reset it
+
+  if (CStringHasContents(ext))
+  {
+    NSArray* pFileExtensions = [[NSString stringWithUTF8String:ext] componentsSeparatedByString: @" "];
+    
+    for (NSString* pFileExtension in pFileExtensions)
+    {
+      UTType* pUTType = [UTType typeWithFilenameExtension:pFileExtension];
+      [pFileTypes addObject:pUTType];
+    }
+  }
+  
+  [(IGRAPHICS_VIEW*) mView promptForFile: pDefaultFileName : pDefaultPath : action : pFileTypes : completionHandler];
+}
+
+void IGraphicsIOS::PromptForDirectory(WDL_String& path, IFileDialogCompletionHandlerFunc completionHandler)
+{
+  assert(completionHandler != nullptr && "You must provide a completion handler on iOS");
+  
+  NSString* pDefaultFileName = nil;
+  NSString* pDefaultPath = nil;
+  NSMutableArray* pFileTypes = [[NSMutableArray alloc] init];
+
+  if (path.GetLength())
+    pDefaultPath = [NSString stringWithCString:path.Get() encoding:NSUTF8StringEncoding];
+  else
+    pDefaultPath = @"";
+
+  path.Set(""); // reset it
+
+  [(IGRAPHICS_VIEW*) mView promptForDirectory:pDefaultPath : completionHandler];
 }
 
 bool IGraphicsIOS::PromptForColor(IColor& color, const char* str, IColorPickerHandlerFunc func)
 {
+  [(IGRAPHICS_VIEW*) mView promptForColor: color: str: func];
   return false;
 }
 
-IPopupMenu* IGraphicsIOS::CreatePlatformPopupMenu(IPopupMenu& menu, const IRECT& bounds, bool& isAsync)
+IPopupMenu* IGraphicsIOS::CreatePlatformPopupMenu(IPopupMenu& menu, const IRECT bounds, bool& isAsync)
 {
   IPopupMenu* pReturnMenu = nullptr;
   isAsync = true;
@@ -255,20 +325,6 @@ bool IGraphicsIOS::SetTextInClipboard(const char* str)
   return false;
 }
 
-void IGraphicsIOS::CreatePlatformImGui()
-{
-#ifdef IGRAPHICS_IMGUI
-  if(mView)
-  {
-    IGRAPHICS_VIEW* pView = (IGRAPHICS_VIEW*) mView;
-    
-    IGRAPHICS_IMGUIVIEW* pImGuiView = [[IGRAPHICS_IMGUIVIEW alloc] initWithIGraphicsView:pView];
-    [pView addSubview: pImGuiView];
-    mImGuiView = pImGuiView;
-  }
-#endif
-}
-
 PlatformFontPtr IGraphicsIOS::LoadPlatformFont(const char* fontID, const char* fileNameOrResID)
 {
   return CoreTextHelpers::LoadPlatformFont(fontID, fileNameOrResID, GetBundleID());
@@ -277,6 +333,11 @@ PlatformFontPtr IGraphicsIOS::LoadPlatformFont(const char* fontID, const char* f
 PlatformFontPtr IGraphicsIOS::LoadPlatformFont(const char* fontID, const char* fontName, ETextStyle style)
 {
   return CoreTextHelpers::LoadPlatformFont(fontID, fontName, style);
+}
+
+PlatformFontPtr IGraphicsIOS::LoadPlatformFont(const char* fontID, void* pData, int dataSize)
+{
+  return CoreTextHelpers::LoadPlatformFont(fontID, pData, dataSize);
 }
 
 void IGraphicsIOS::CachePlatformFont(const char* fontID, const PlatformFontPtr& font)
@@ -289,6 +350,21 @@ void IGraphicsIOS::LaunchBluetoothMidiDialog(float x, float y)
   ReleaseMouseCapture();
   NSDictionary* dic = @{@"x": @(x), @"y": @(y)};
   [[NSNotificationCenter defaultCenter] postNotificationName:@"LaunchBTMidiDialog" object:nil userInfo:dic];
+}
+
+EUIAppearance IGraphicsIOS::GetUIAppearance() const
+{
+  IGRAPHICS_VIEW* pView = (IGRAPHICS_VIEW*) mView;
+  
+  if (pView)
+  {
+    return [[pView traitCollection] userInterfaceStyle] == UIUserInterfaceStyleDark ? EUIAppearance::Dark
+                                                                                    : EUIAppearance::Light;
+  }
+  else
+  {
+    return EUIAppearance::Light;
+  }
 }
 
 #if defined IGRAPHICS_NANOVG

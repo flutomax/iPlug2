@@ -17,7 +17,7 @@ interface IASIO : public IUnknown
 	virtual void getErrorMessage(char *string) = 0;	
 	virtual ASIOError start() = 0;
 	virtual ASIOError stop() = 0;
-	virtual ASIOError getChannels(long *numInputChannels, long *numOutputChannels) = 0;
+	virtual ASIOError GetChannels(long *numInputChannels, long *numOutputChannels) = 0;
 	virtual ASIOError getLatencies(long *inputLatency, long *outputLatency) = 0;
 	virtual ASIOError getBufferSize(long *minSize, long *maxSize,
 		long *preferredSize, long *granularity) = 0;

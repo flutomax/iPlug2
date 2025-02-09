@@ -88,7 +88,7 @@ using namespace igraphics;
 {
   IPopupMenu* mIPopupMenu;
 }
-- (id) initWithIPopupMenuAndReciever: (IPopupMenu*) pMenu : (NSView*) pView;
+- (id) initWithIPopupMenuAndReceiver: (IPopupMenu*) pMenu : (NSView*) pView;
 - (IPopupMenu*) iPopupMenu;
 @end
 
@@ -107,10 +107,19 @@ using namespace igraphics;
 - (bool) becomeFirstResponder;
 @end
 
-@interface IGRAPHICS_VIEW : NSView <NSTextFieldDelegate/*, WKScriptMessageHandler*/>
+#ifdef IGRAPHICS_GL
+#define VIEW_BASE NSOpenGLView
+#else
+#define VIEW_BASE NSView
+#endif
+
+@interface IGRAPHICS_VIEW : VIEW_BASE <NSTextFieldDelegate, NSDraggingSource/*, WKScriptMessageHandler*/>
 {
-  NSTrackingArea* mTrackingArea;
+  CVDisplayLinkRef mDisplayLink;
+  dispatch_source_t mDisplaySource;
   NSTimer* mTimer;
+  
+  NSTrackingArea* mTrackingArea;
   IGRAPHICS_TEXTFIELD* mTextFieldView;
   NSCursor* mMoveCursor;
   float mPrevX, mPrevY;
@@ -128,10 +137,9 @@ using namespace igraphics;
 - (void) viewDidChangeBackingProperties: (NSNotification*) pNotification;
 - (void) drawRect: (NSRect) bounds;
 - (void) render;
-- (void) onTimer: (NSTimer*) pTimer;
 - (void) killTimer;
-- (BOOL) resignFirstResponder;
-- (void) windowDidResign: (NSNotification*)notification;
+- (void) onTimer: (NSTimer*) pTimer;
+- (void) viewDidChangeEffectiveAppearance;
 //mouse
 - (void) getMouseXY: (NSEvent*) pEvent : (float&) x : (float&) y;
 - (IMouseInfo) getMouseLeft: (NSEvent*) pEvent;
@@ -166,35 +174,8 @@ using namespace igraphics;
 //drag-and-drop
 - (NSDragOperation) draggingEntered: (id <NSDraggingInfo>) sender;
 - (BOOL) performDragOperation: (id<NSDraggingInfo>) sender;
+- (NSDragOperation)draggingSession:(NSDraggingSession*) session sourceOperationMaskForDraggingContext:(NSDraggingContext)context;
 //
 - (void) setMouseCursor: (ECursor) cursorType;
-//gestures
-- (void) attachGestureRecognizer: (EGestureType) type;
-- (BOOL) gestureRecognizer:(NSGestureRecognizer*) gestureRecognizer shouldReceiveTouch:(NSTouch*)touch;
-- (void) onClickGesture: (NSClickGestureRecognizer*) recognizer;
-- (void) onPressGesture: (NSPressGestureRecognizer*) recognizer;
-- (void) onPanGesture: (NSPanGestureRecognizer*) recognizer;
-- (void) onMagnificationGesture: (NSMagnificationGestureRecognizer*) recognizer;
-- (void) onRotateGesture: (NSRotationGestureRecognizer*) recognizer;
 @end
-
-@interface IGRAPHICS_GLLAYER : NSOpenGLLayer
-{
-  IGRAPHICS_VIEW* mView;
-}
-
-- (id) initWithIGraphicsView: (IGRAPHICS_VIEW*) pView;
-@end
-
-#ifdef IGRAPHICS_IMGUI
-#import <MetalKit/MetalKit.h>
-
-@interface IGRAPHICS_IMGUIVIEW : MTKView
-{
-  IGRAPHICS_VIEW* mView;
-}
-@property (nonatomic, strong) id <MTLCommandQueue> commandQueue;
-- (id) initWithIGraphicsView: (IGRAPHICS_VIEW*) pView;
-@end
-#endif
 

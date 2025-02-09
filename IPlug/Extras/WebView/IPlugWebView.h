@@ -39,8 +39,9 @@ public:
   IWebView(bool opaque = true);
   virtual ~IWebView();
   
-  void* OpenWebView(void* pParent, float x, float y, float w, float h, float scale = 1.);
+  void* OpenWebView(void* pParent, float x, float y, float w, float h, float scale = 1.0f, bool enableDevTools = true);
   void CloseWebView();
+  void HideWebView(bool hide);
   
   /** Load an HTML string into the webview */
   void LoadHTML(const char* html);
@@ -61,8 +62,11 @@ public:
   /** Enable scrolling on the webview. NOTE: currently only implemented for iOS */
   void EnableScroll(bool enable);
   
-  /** Set the bounds of the webview in the parent window. xywh are specifed in relation to a 1:1 non retina screen. On Windows the screen scale is passed in. */
-  void SetWebViewBounds(float x, float y, float w, float h, float scale = 1.); //TODO: get screen scale in impl?
+  /** Sets whether the webview is interactive */
+  void EnableInteraction(bool enable);
+  
+  /** Set the bounds of the webview in the parent window. xywh are specifed in relation to a 1:1 non retina screen */
+  void SetWebViewBounds(float x, float y, float w, float h, float scale = 1.);
 
   /** Called when the web view is ready to receive navigation instructions*/
   virtual void OnWebViewReady() {}
@@ -72,13 +76,6 @@ public:
   
   /** When a script in the web view posts a message, it will arrive as a UTF8 json string here */
   virtual void OnMessageFromWebView(const char* json) {}
-
-#if defined OS_WIN
-  /** Set the paths required for the Windows ICoreWebView2 component
-   * @param dllPath (Windows only) an absolute path to the WebView2Loader.dll that is required to use the WebView2 on windows
-   * @param tmpPath (Windows only) an absolute path to the folder that should be used */
-  void SetWebViewPaths(const char* dllPath, const char* tmpPath) { mDLLPath.Set(dllPath); mTmpPath.Set(tmpPath); }
-#endif
   
 private:
   bool mOpaque = true;
@@ -87,13 +84,13 @@ private:
   void* mWebConfig = nullptr;
   void* mScriptHandler = nullptr;
 #elif defined OS_WIN
+  HWND mParentWnd = NULL;
   wil::com_ptr<ICoreWebView2Controller> mWebViewCtrlr;
   wil::com_ptr<ICoreWebView2> mWebViewWnd;
   EventRegistrationToken mWebMessageReceivedToken;
   EventRegistrationToken mNavigationCompletedToken;
-  WDL_String mDLLPath;
-  WDL_String mTmpPath;
-  HMODULE mDLLHandle = nullptr;
+  EventRegistrationToken mContextMenuRequestedToken;
+  bool mShowOnLoad = true;
 #endif
 };
 

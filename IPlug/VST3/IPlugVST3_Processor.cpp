@@ -37,6 +37,8 @@ tresult PLUGIN_API IPlugVST3Processor::initialize(FUnknown* context)
     Initialize(this);
     IPlugVST3GetHost(this, context);
     OnHostIdentified();
+    OnParamReset(kReset);
+    
     return kResultOk;
   }
   
@@ -52,8 +54,7 @@ tresult PLUGIN_API IPlugVST3Processor::setBusArrangements(SpeakerArrangement* pI
 {
   TRACE
   
-  SetBusArrangements(pInputBusArrangements, numInBuses, pOutputBusArrangements, numOutBuses);
-  return kResultTrue;
+  return SetBusArrangements(this, pInputBusArrangements, numInBuses, pOutputBusArrangements, numOutBuses) ? kResultTrue : kResultFalse;
 }
 
 tresult PLUGIN_API IPlugVST3Processor::setActive(TBool state)
@@ -180,6 +181,18 @@ tresult PLUGIN_API IPlugVST3Processor::notify(IMessage* message)
       
       return kResultFalse;
     }
+  }
+  if (!strcmp(message->getMessageID(), "SSMFUI")) // sysex message from UI
+  {
+    if (message->getAttributes()->getBinary("D", data, size) == kResultOk)
+    {
+      int64 offset = 0;
+      message->getAttributes()->getInt("O", offset);
+      SysExData sysex {(int) offset, (int) size, data};
+      mSysExDataFromEditor.Push(sysex);
+      return kResultOk;
+    }
+    return kResultFalse;
   }
   else if (!strcmp(message->getMessageID(), "SAMFUI")) // message from UI
   {

@@ -54,15 +54,27 @@ using namespace igraphics;
 
 @end
 
-@interface IGRAPHICS_VIEW : UIScrollView <UITextFieldDelegate, UIScrollViewDelegate, UIPopoverPresentationControllerDelegate, UIGestureRecognizerDelegate>
+@interface IGRAPHICS_VIEW : UIView
+<
+UITextFieldDelegate,
+UIPopoverPresentationControllerDelegate,
+UIGestureRecognizerDelegate,
+UITraitEnvironment,
+UIDocumentPickerDelegate,
+UIColorPickerViewControllerDelegate
+>
 {
 @public
   IGraphicsIOS* mGraphics;
   IGRAPHICS_UITABLEVC* mMenuTableController;
   UINavigationController* mMenuNavigationController;
   UITextField* mTextField;
+  UIAlertController* mAlertController;
   CAMetalLayer* mMTLLayer;
   int mTextFieldLength;
+  IColorPickerHandlerFunc mColorPickerHandlerFunc;
+  IFileDialogCompletionHandlerFunc mFileDialogFunc;
+  float mPrevX, mPrevY;
 }
 - (id) initWithIGraphics: (IGraphicsIOS*) pGraphics;
 - (BOOL) isOpaque;
@@ -72,31 +84,34 @@ using namespace igraphics;
 - (IPopupMenu*) createPopupMenu: (IPopupMenu&) menu : (CGRect) bounds;
 - (void) createTextEntry: (int) paramIdx : (const IText&) text : (const char*) str : (int) length : (CGRect) areaRect;
 - (void) endUserInput;
-- (void) showMessageBox: (const char*) str : (const char*) caption : (EMsgBoxType) type : (IMsgBoxCompletionHanderFunc) completionHandler;
+- (void) showMessageBox: (const char*) str : (const char*) title : (EMsgBoxType) type : (IMsgBoxCompletionHandlerFunc) completionHandler;
+- (void) promptForFile: (NSString*) fileName : (NSString*) path : (EFileAction) action : (NSArray*) contentTypes : (IFileDialogCompletionHandlerFunc) completionHandler;
+- (void) promptForDirectory: (NSString*) path : (IFileDialogCompletionHandlerFunc) completionHandler;
+- (BOOL) promptForColor: (IColor&) color : (const char*) str : (IColorPickerHandlerFunc) func;
+- (void) presentationControllerDidDismiss: (UIPresentationController*) presentationController;
 
-- (void)presentationControllerDidDismiss: (UIPresentationController *) presentationController;
+//UIDocumentPickerDelegate,
+- (void) documentPicker:(UIDocumentPickerViewController*) controller didPickDocumentsAtURLs:(NSArray <NSURL *>*)urls;
+- (void) documentPickerWasCancelled:(UIDocumentPickerViewController*) controller;
+
+//UIColorPickerViewControllerDelegate
+- (void) colorPickerViewControllerDidSelectColor:(UIColorPickerViewController*) viewController;
+- (void) colorPickerViewControllerDidFinish:(UIColorPickerViewController*) viewController;
 
 //gestures
 - (void) attachGestureRecognizer: (EGestureType) type;
--(BOOL) gestureRecognizer:(UIGestureRecognizer*) gestureRecognizer shouldReceiveTouch:(UITouch*)touch;
+- (BOOL) gestureRecognizer:(UIGestureRecognizer*) gestureRecognizer shouldReceiveTouch:(UITouch*)touch;
 - (void) onTapGesture: (UITapGestureRecognizer*) recognizer;
 - (void) onLongPressGesture: (UILongPressGestureRecognizer*) recognizer;
 - (void) onSwipeGesture: (UISwipeGestureRecognizer*) recognizer;
 - (void) onPinchGesture: (UIPinchGestureRecognizer*) recognizer;
 - (void) onRotateGesture: (UIRotationGestureRecognizer*) recognizer;
+
+- (void) getLastTouchLocation: (float&) x : (float&) y;
+
+- (void) traitCollectionDidChange: (UITraitCollection*) previousTraitCollection;
+
 @property (readonly) CAMetalLayer* metalLayer;
 @property (nonatomic, strong) CADisplayLink *displayLink;
 
 @end
-
-#ifdef IGRAPHICS_IMGUI
-#import <MetalKit/MetalKit.h>
-
-@interface IGRAPHICS_IMGUIVIEW : MTKView
-{
-  IGraphicsIOS_View* mView;
-}
-@property (nonatomic, strong) id <MTLCommandQueue> commandQueue;
-- (id) initWithIGraphicsView: (IGraphicsIOS_View*) pView;
-@end
-#endif

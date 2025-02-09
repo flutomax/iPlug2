@@ -26,21 +26,18 @@ BEGIN_IGRAPHICS_NAMESPACE
 class ICornerResizerControl : public IControl
 {
 public:
-  ICornerResizerControl(IRECT graphicsBounds, float size)
+  ICornerResizerControl(const IRECT& graphicsBounds, float size, const IColor& color = COLOR_TRANSLUCENT, const IColor& mouseOverColour = COLOR_BLACK, const IColor& dragColor = COLOR_BLACK)
   : IControl(graphicsBounds.GetFromBRHC(size, size).GetPadded(-1))
-  , mInitialGraphicsBounds(graphicsBounds)
   , mSize(size)
+  , mInitialGraphicsBounds(graphicsBounds)
+  , mColor(color)
+  , mMouseOverColor(mouseOverColour)
+  , mDragColor(dragColor)
   {
   }
 
   void Draw(IGraphics& g) override
   {
-    /* ZEF -> Old drawing
-    if(GetMouseIsOver() || GetUI()->mResizingInProcess)
-      g.FillTriangle(COLOR_BLACK, mRECT.L, mRECT.B, mRECT.R, mRECT.T, mRECT.R, mRECT.B);
-    else
-      g.FillTriangle(COLOR_TRANSLUCENT, mRECT.L, mRECT.B, mRECT.R, mRECT.T, mRECT.R, mRECT.B);
-    */
     g.FillTriangle(COLOR_TRANSLUCENT, mRECT.L, mRECT.B, mRECT.R, mRECT.T, mRECT.R, mRECT.B);
     const float k = 1.f / GetUI()->GetDrawScale();
     const float delta = 5.f * k;
@@ -56,7 +53,6 @@ public:
 
   void OnMouseDown(float x, float y, const IMouseMod& mod) override
   {
-    GetUI()->OnLostFocus();
     GetUI()->StartDragResize();
   }
     
@@ -92,6 +88,7 @@ private:
   bool mMouseOver = false;
   ECursor mPrevCursorType = ECursor::ARROW;
   IRECT mInitialGraphicsBounds;
+  IColor mColor, mMouseOverColor, mDragColor;
 };
 
 END_IGRAPHICS_NAMESPACE

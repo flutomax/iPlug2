@@ -437,7 +437,7 @@ ASIOError IASIOThiscallResolver::stop()
     return result;
 }
 
-ASIOError IASIOThiscallResolver::getChannels(long *numInputChannels, long *numOutputChannels)
+ASIOError IASIOThiscallResolver::GetChannels(long *numInputChannels, long *numOutputChannels)
 {
     ASIOBool result;
     CALL_THISCALL_2( result, that_, 36, numInputChannels, numOutputChannels );

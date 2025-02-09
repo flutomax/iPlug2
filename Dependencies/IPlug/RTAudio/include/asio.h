@@ -157,7 +157,7 @@ enum {
 	//	ASIO DSD format.
 	ASIOSTDSDInt8LSB1   = 32,		// DSD 1 bit data, 8 samples per byte. First sample in Least significant bit.
 	ASIOSTDSDInt8MSB1   = 33,		// DSD 1 bit data, 8 samples per byte. First sample in Most significant bit.
-	ASIOSTDSDInt8NER8	= 40,		// DSD 8 bit data, 1 sample per byte. No Endianness required.
+	ASIOSTDSDInt8NER8	= 40,		// DSD 8 bit data, 1 sample per byte. No EEndianType required.
 
 	ASIOSTLastEntry
 };
@@ -182,7 +182,7 @@ enum {
 // In DSD the "word" size is 1 bit. This is not a major problem and can easily
 // be dealt with if we ensure that we always deal with a multiple of 8 samples.
 //
-// DSD brings with it another twist to the Endianness religion. How are the
+// DSD brings with it another twist to the EEndianType religion. How are the
 // samples packed into the byte. It would be nice to just say the most significant
 // bit is always the first sample, however there would then be a performance hit
 // on little endian machines. Looking at how some of the processing goes...

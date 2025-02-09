@@ -22,7 +22,7 @@
 #include <locale>
 
 #ifdef _MSC_VER
-#if (_MSC_VER >= 1900 /* VS 2015*/) && (_MSC_VER <= 1920 /* VS 2019 */)
+#if (_MSC_VER >= 1900 /* VS 2015*/) && (_MSC_VER <= 1920 /* pre VS 2019 */)
 std::locale::id std::codecvt<char16_t, char, _Mbstatet>::id;
 #endif
 #endif
@@ -84,9 +84,10 @@ ITextEntryControl::ITextEntryControl()
       auto progress = pCaller->GetAnimationProgress();
       
       if(progress > 0.5) {
-        mDrawCursor = false;       
+        mDrawCursor = false;
+        pCaller->SetDirty(false);
       }
-      pCaller->SetDirty(false);
+   
       if(progress > 1.) {
         pCaller->OnEndAnimation();
         return;
@@ -305,7 +306,7 @@ bool ITextEntryControl::OnKeyDown(float x, float y, const IKeyPress& key)
               break;
             if (key.VK >= kVK_NUMPAD0 && key.VK <= kVK_NUMPAD9)
               break;
-            if (stbKey == '+' || stbKey == '-' || stbKey == '.' || stbKey == ',') // ',' z> may be localized decimal separator
+            if (stbKey == '+' || stbKey == '-' || stbKey == '.' || stbKey == ',') // ',' Vasan added -> may be localized decimal separator
               break;
             stbKey = 0;
             break;
@@ -337,11 +338,6 @@ void ITextEntryControl::OnEndAnimation()
 {
   if(mEditing)
     SetDirty(true);
-}
-
-void ITextEntryControl::OnLostFocus()
-{
-  CommitEdit();
 }
 
 void ITextEntryControl::CopySelection()
@@ -554,7 +550,7 @@ void ITextEntryControl::DismissEdit()
 {
   mEditing = false;
   SetTargetAndDrawRECTs(IRECT());
-  GetUI()->mInTextEntry = nullptr;
+  GetUI()->ClearInTextEntryControl();
   GetUI()->SetAllControlsDirty();
 }
 
@@ -570,9 +566,4 @@ void ITextEntryControl::SetStr(const char* str)
 {
   mCharWidths.Resize(0, false);
   mEditString = StringConvert{}.from_bytes(std::string(str));
-
-  if (mEditState.select_start != mEditState.select_end)
-  {
-    SelectAll();
-  }
 }

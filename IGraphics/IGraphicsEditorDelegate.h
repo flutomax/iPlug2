@@ -40,7 +40,7 @@ public:
   //IEditorDelegate
   void* OpenWindow(void* pHandle) final;
   void CloseWindow() final;
-  void SetScreenScale(double scale) final;
+  void SetScreenScale(float scale) final;
   
   bool OnKeyDown(const IKeyPress& key) override;
   bool OnKeyUp(const IKeyPress& key) override;
@@ -74,6 +74,9 @@ public:
   /** Get a pointer to the IGraphics context */
   IGraphics* GetUI() { return mGraphics.get(); };
 
+  /** Get a const pointer to the IGraphics context */
+  const IGraphics* GetUI() const { return mGraphics.get(); };
+
   /** Serializes the size and scale of the IGraphics.
    * @param chunk The output chunk to serialize to. Will append data if the chunk has already been started.
    * @return \c true if the serialization was successful */
@@ -84,9 +87,6 @@ public:
    * @param startPos The start position in the chunk where parameter values are stored
    * @return The new chunk position (endPos) */
   int UnserializeEditorSize(const IByteChunk& chunk, int startPos);
-
-  void OnParamChangeUI(int paramIdx, EParamSource source = kUnknown) override;
-  void ResetLastEditorSize();
     
 protected:
   std::function<IGraphics*()> mMakeGraphicsFunc = nullptr;

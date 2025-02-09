@@ -9,6 +9,7 @@
 */
 
 #include "IPlugAPP_host.h"
+#include "IPlugPaths.h"
 
 #ifdef OS_WIN
 #include <sys/stat.h>
@@ -85,18 +86,14 @@ void IPlugAPPHost::CloseWindow()
 bool IPlugAPPHost::InitState()
 {
 #if defined OS_WIN
-  /* // old
+  /*
   TCHAR strPath[MAX_PATH_LEN];
-  SHGetFolderPathA(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, strPath);
+  SHGetFolderPathA( NULL, CSIDL_LOCAL_APPDATA, NULL, 0, strPath );
   mINIPath.SetFormatted(MAX_PATH_LEN, "%s\\%s\\", strPath, BUNDLE_NAME);
   */
-  HMODULE module = NULL;
-  GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, (LPCTSTR) & __FUNCTION__, &module);
-  TCHAR path[MAX_PATH_LEN];
-  GetModuleFileNameA(module, path, MAX_PATH_LEN);
-  mINIPath.Set(path);
-  mINIPath.remove_fileext();
-  mINIPath.Append(".ini");
+  HostPath(mINIPath);
+  mINIPath.remove_trailing_dirchars();
+  mINIPath.Append(WDL_DIRCHAR_STR);
 #elif defined OS_MAC
   mINIPath.SetFormatted(MAX_PATH_LEN, "%s/Library/Application Support/%s/", getenv("HOME"), BUNDLE_NAME);
 #else
@@ -107,7 +104,9 @@ bool IPlugAPPHost::InitState()
 
   if(stat(mINIPath.Get(), &st) == 0) // if directory exists
   {
-#if defined OS_MAC
+#ifdef INI_FILENAME
+    mINIPath.Append(INI_FILENAME);
+#else
     mINIPath.Append("settings.ini"); // add file name to path
 #endif
     char buf[STRBUFSZ];
@@ -146,10 +145,13 @@ bool IPlugAPPHost::InitState()
   {
 #if defined OS_WIN
     // folder doesn't exist - make folder and make file
-  /*  old
-  CreateDirectory(mINIPath.Get(), NULL);
-    mINIPath.Append("settings.ini");
-    UpdateINI(); // will write file if doesn't exist    */
+    CreateDirectory(mINIPath.Get(), NULL);
+#ifdef INI_FILENAME
+    mINIPath.Append(INI_FILENAME);
+#else
+    mINIPath.Append("settings.ini"); // add file name to path
+#endif
+    UpdateINI(); // will write file if doesn't exist
 #elif defined OS_MAC
     mode_t process_mask = umask(0);
     int result_code = mkdir(mINIPath.Get(), S_IRWXU | S_IRWXG | S_IRWXO);
@@ -157,7 +159,12 @@ bool IPlugAPPHost::InitState()
 
     if(!result_code)
     {
-      mINIPath.Append("\\settings.ini");
+#ifdef INI_FILENAME
+      mINIPath.Append("\\"); 
+      mINIPath.Append(INI_FILENAME);
+#else
+      mINIPath.Append("\\settings.ini"); // add file name to path
+#endif
       UpdateINI(); // will write file if doesn't exist
     }
     else
@@ -585,7 +592,7 @@ void IPlugAPPHost::CloseAudio()
 }
 
 bool IPlugAPPHost::InitAudio(uint32_t inId, uint32_t outId, uint32_t sr, uint32_t iovs)
-{  
+{
   CloseAudio();
 
   RtAudio::StreamParameters iParams, oParams;

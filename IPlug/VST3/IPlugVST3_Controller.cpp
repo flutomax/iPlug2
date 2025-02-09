@@ -26,7 +26,9 @@ IPlugVST3Controller::IPlugVST3Controller(const InstanceInfo& info, const Config&
 , mPlugIsInstrument(config.plugType == kInstrument)
 , mDoesMidiIn(config.plugDoesMidiIn)
 , mProcessorGUID(info.mOtherGUID)
+, IPlugVST3ControllerBase(parameters)
 {
+  CreateTimer();
 }
 
 IPlugVST3Controller::~IPlugVST3Controller()
@@ -39,10 +41,16 @@ tresult PLUGIN_API IPlugVST3Controller::initialize(FUnknown* context)
 {
   if (EditControllerEx1::initialize(context) == kResultTrue)
   {
-    Initialize(this, parameters, mPlugIsInstrument, mDoesMidiIn);
+    Initialize(this, mPlugIsInstrument, mDoesMidiIn);
     IPlugVST3GetHost(this, context);
     OnHostIdentified();
-
+    OnParamReset(kReset);
+    
+    // Load iplug parameters into the GUI thread visible values
+    
+    for (int i = 0; i < NParams(); ++i)
+      parameters.getParameter(i)->setNormalized(GetParam(i)->GetNormalized());
+    
     return kResultTrue;
   }
 
@@ -51,7 +59,7 @@ tresult PLUGIN_API IPlugVST3Controller::initialize(FUnknown* context)
 
 IPlugView* PLUGIN_API IPlugVST3Controller::createView(const char* name)
 {
-  if (name && strcmp(name, "editor") == 0)
+  if (HasUI() && name && strcmp(name, "editor") == 0)
   {
     mView = new ViewType(*this);
     return mView;
@@ -77,24 +85,22 @@ tresult PLUGIN_API IPlugVST3Controller::getState(IBStream* pState)
   return kResultOk;
 }
 
-//ParamValue PLUGIN_API IPlugVST3Controller::getParamNormalized(ParamID tag)
-//{
-//  if (tag >= kBypassParam)
-//    return EditControllerEx1::getParamNormalized(tag);
-//  
-//  return IPlugVST3ControllerBase::GetParamNormalized(this, tag);
-//}
+ParamValue PLUGIN_API IPlugVST3Controller::getParamNormalized(ParamID tag)
+{
+  return IPlugVST3ControllerBase::GetParamNormalized(tag);
+}
 
 tresult PLUGIN_API IPlugVST3Controller::setParamNormalized(ParamID tag, ParamValue value)
 {
-  IPlugVST3ControllerBase::SetParamNormalized(this, tag, value);
-  
-  return EditControllerEx1::setParamNormalized(tag, value);
+  if (IPlugVST3ControllerBase::SetParamNormalized(this, tag, value))
+    return kResultTrue;
+  else
+    return kResultFalse;
 }
 
 tresult PLUGIN_API IPlugVST3Controller::getMidiControllerAssignment(int32 busIndex, int16 midiChannel, CtrlNumber midiCCNumber, ParamID& tag)
 {
-  if (busIndex == 0)
+  if (busIndex == 0 && midiChannel < VST3_NUM_CC_CHANS)
   {
     tag = kMIDICCParamStartIdx + (midiChannel * kCountCtrlNumber) + midiCCNumber;
     return kResultTrue;
@@ -105,18 +111,7 @@ tresult PLUGIN_API IPlugVST3Controller::getMidiControllerAssignment(int32 busInd
 
 #pragma mark IUnitInfo overrides
 
-tresult PLUGIN_API IPlugVST3Controller::getProgramName(ProgramListID listId, int32 programIndex, String128 name /*out*/)
-{
-  if (NPresets() && listId == kPresetParam)
-  {
-    Steinberg::UString(name, 128).fromAscii(GetPresetName(programIndex));
-    return kResultTrue;
-  }
-
-  return kResultFalse;
-}
-
-//void IPlugVST3Controller::InformHostOfProgramChange()
+//void IPlugVST3Controller::InformHostOfPresetChange()
 //{
 //  if (NPresets())
 //  {
@@ -128,12 +123,21 @@ tresult PLUGIN_API IPlugVST3Controller::getProgramName(ProgramListID listId, int
 //  }
 //}
 
+#pragma mark IInfoListener overrides
+
+Steinberg::tresult PLUGIN_API IPlugVST3Controller::setChannelContextInfos(Steinberg::Vst::IAttributeList* pList)
+{
+  return IPlugVST3ControllerBase::SetChannelContextInfos(pList) ? kResultTrue : kResultFalse;
+}
+
+#pragma mark -
+
 bool IPlugVST3Controller::EditorResize(int viewWidth, int viewHeight)
 {
   if (HasUI())
   {
     if (viewWidth != GetEditorWidth() || viewHeight != GetEditorHeight())
-      mView->resize(viewWidth, viewHeight);
+      mView->Resize(viewWidth, viewHeight);
  
     SetEditorSize(viewWidth, viewHeight);
   }
@@ -143,6 +147,9 @@ bool IPlugVST3Controller::EditorResize(int viewWidth, int viewHeight)
 
 void IPlugVST3Controller::DirtyParametersFromUI()
 {
+  for (int i = 0; i < NParams(); i++)
+    IPlugVST3ControllerBase::SetVST3ParamNormalized(i, GetParam(i)->GetNormalized());
+
   startGroupEdit();
   IPlugAPIBase::DirtyParametersFromUI();
   finishGroupEdit();
@@ -267,4 +274,10 @@ void IPlugVST3Controller::SendArbitraryMsgFromUI(int msgTag, int ctrlTag, int da
   message->getAttributes()->setInt("CT", ctrlTag);
   message->getAttributes()->setBinary("D", pData, dataSize);
   sendMessage(message);
+}
+
+void IPlugVST3Controller::SendParameterValueFromUI(int paramIdx, double normalisedValue)
+{
+  IPlugVST3ControllerBase::SetVST3ParamNormalized(paramIdx, normalisedValue);
+  IPlugAPIBase::SendParameterValueFromUI(paramIdx, normalisedValue);
 }

@@ -130,24 +130,6 @@ void IParam::InitEnum(const char* name, int defaultVal, const std::initializer_l
   }
 }
 
-void IParam::InitNote(const char* name, int defaultValue, int nEnums, const char* label, int flags, const char* group, const char* listItems, ...)
-{
-  if (mType == kTypeNone) mType = kTypeNote;
-
-  InitInt(name, defaultValue, 0, nEnums - 1, label, flags | kFlagStepped, group);
-
-  if (listItems)
-  {
-    SetDisplayText(0, listItems);
-
-    va_list args;
-    va_start(args, listItems);
-    for (auto i = 1; i < nEnums; ++i)
-      SetDisplayText(i, va_arg(args, const char*));
-    va_end(args);
-  }
-}
-
 void IParam::InitInt(const char* name, int defaultVal, int minVal, int maxVal, const char* label, int flags, const char* group)
 {
   if (mType == kTypeNone) mType = kTypeInt;
@@ -222,7 +204,7 @@ void IParam::InitGain(const char *name, double defaultVal, double minVal, double
 void IParam::InitDB(const char* name, double defaultVal, double minVal, double maxVal, double step, int flags, const char* group)
 {
   const double kDBCurve = 0.26849;
-  InitDouble(name, defaultVal, minVal, maxVal, step, "dB", flags | IParam::kFlagMinusInfDisplay | IParam::kFlagForceRound, group, IParam::ShapePowCurve(kDBCurve), IParam::kUnitDB);
+  InitDouble(name, defaultVal, minVal, maxVal, step, "dB", flags | kFlagMinusInfDisplay | kFlagForceRound, group, ShapePowCurve(kDBCurve), kUnitDB);
 }
 
 void IParam::InitPercentage(const char *name, double defaultVal, double minVal, double maxVal, int flags, const char *group)
@@ -283,10 +265,15 @@ void IParam::SetDisplayText(double value, const char* str)
   strcpy(pDT->mText, str);
 }
 
-void IParam::GetDisplayForHost(double value, bool normalized, WDL_String& str, bool withDisplayText, bool valueonly) const
+void IParam::SetDisplayPrecision(int precision)
 {
-  if (normalized)
-    value = FromNormalized(value);
+  mDisplayPrecision = precision;
+}
+
+void IParam::GetDisplay(double value, bool normalized, WDL_String& str, bool withDisplayText, bool valueonly) const
+{
+  if (normalized) 
+		value = FromNormalized(value);
 
   if (mDisplayFunction != nullptr)
   {
@@ -304,8 +291,8 @@ void IParam::GetDisplayForHost(double value, bool normalized, WDL_String& str, b
       return;
     }
   }
-
-  if ((mFlags & kFlagMinusInfDisplay) && (value == mMin))
+	
+	if ((mFlags & kFlagMinusInfDisplay) && (value == mMin))
   {
     str.Set("-inf.");
     return;
@@ -339,7 +326,7 @@ void IParam::GetDisplayForHost(double value, bool normalized, WDL_String& str, b
   else if ((mFlags & kFlagSignDisplay) && displayValue)
   {
     char fmt[16];
-    sprintf(fmt, "%%+.%df", mDisplayPrecision);
+    snprintf(fmt, 16, "%%+.%df", mDisplayPrecision);
     str.SetFormatted(MAX_PARAM_DISPLAY_LEN, fmt, displayValue);
   }
   else
@@ -355,17 +342,17 @@ void IParam::GetDisplayForHost(double value, bool normalized, WDL_String& str, b
   }
 }
 
-const char* IParam::GetNameForHost() const
+const char* IParam::GetName() const
 {
   return mName;
 }
 
-const char* IParam::GetLabelForHost() const
+const char* IParam::GetLabel() const
 {
   return (CStringHasContents(GetDisplayText(static_cast<int>(mValue.load())))) ? "" : mLabel;
 }
 
-const char* IParam::GetGroupForHost() const
+const char* IParam::GetGroup() const
 {
   return mParamGroup;
 }
@@ -397,15 +384,6 @@ bool IParam::MapDisplayText(const char* str, double* pValue) const
   int n = mDisplayTexts.GetSize();
   for (DisplayText* pDT = mDisplayTexts.Get(); n; --n, ++pDT)
   {
-    if (mType == kTypeNote)
-    {
-      if (!stricmp(str, pDT->mText))
-      {
-        *pValue = pDT->mValue;
-        return true;
-      }
-    }
-    else
     if (!strcmp(str, pDT->mText))
     {
       *pValue = pDT->mValue;
@@ -425,7 +403,7 @@ double IParam::StringToValue(const char* str) const
 
   if (!mapped && Type() != kTypeEnum && Type() != kTypeBool)
   {
-    // z> if ',' if localized decimal separator then replace it '.'
+    // Vasan> if ',' if localized decimal separator then replace it '.'
     if (strstr(str, ",") != NULL)
     {
       char* sp = strdup(str);
@@ -462,7 +440,7 @@ void IParam::GetJSON(WDL_String& json, int idx) const
 {
   json.AppendFormatted(8192, "{");
   json.AppendFormatted(8192, "\"id\":%i, ", idx);
-  json.AppendFormatted(8192, "\"name\":\"%s\", ", GetNameForHost());
+  json.AppendFormatted(8192, "\"name\":\"%s\", ", GetName());
   switch (Type())
   {
     case IParam::kTypeNone:
@@ -485,27 +463,12 @@ void IParam::GetJSON(WDL_String& json, int idx) const
   json.AppendFormatted(8192, "\"min\":%f, ", GetMin());
   json.AppendFormatted(8192, "\"max\":%f, ", GetMax());
   json.AppendFormatted(8192, "\"default\":%f, ", GetDefault());
+  json.AppendFormatted(8192, "\"display_type\":%i, ", mShape->GetDisplayType());
   json.AppendFormatted(8192, "\"rate\":\"control\"");
   json.AppendFormatted(8192, "}");
 }
 
 void IParam::PrintDetails() const
 {
-  DBGMSG("%s %f", GetNameForHost(), Value());
-}
-
-void IParam::Inc() 
-{
-  double v = mValue.load() + mStep;
-  if (v > mMax)
-    v = mMin;
-  Set(v);
-}
-
-void IParam::Dec() 
-{
-  double v = mValue.load() - mStep;
-  if (v < mMin)
-    v = mMax;
-  Set(v);
+  DBGMSG("%s %f", GetName(), Value());
 }

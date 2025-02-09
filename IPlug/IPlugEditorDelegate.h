@@ -85,11 +85,14 @@ public:
   int NParams() const { return mParams.GetSize(); }
   
   /** If you are not using IGraphics, you can implement this method to attach to the native parent view e.g. NSView, UIView, HWND.
-   *  Defer calling OnUIOpen() if nessecary. */
+   *  Defer calling OnUIOpen() if necessary. */
   virtual void* OpenWindow(void* pParent) { OnUIOpen(); return nullptr; }
   
   /** If you are not using IGraphics you can if you need to free resources etc when the window closes. Call base implementation. */
   virtual void CloseWindow() { OnUIClose(); }
+
+  /** Called by app wrappers when the OS window scaling buttons/resizers are used */
+  virtual void OnParentWindowResize(int width, int height) { /* NO-OP*/ }
   
 #pragma mark - Methods you may want to override...
   /** Override this method to do something before the UI is opened. You must call the base implementation to make sure controls linked to parameters get updated correctly. */
@@ -113,13 +116,13 @@ public:
    * WARNING: this method can in some cases be called on the realtime audio thread */
   virtual void OnParamChange(int paramIdx) {}
   
-  /** Override this method to do something to your UI when a parameter changes.
+  /** Override this method to do something when a parameter changes on the main/UI thread
    * Like OnParamChange, OnParamChangeUI will be called when a parameter changes. However, whereas OnParamChange may be called on the audio thread and should be used to update DSP state, OnParamChangeUI is always called on the low-priority thread, should be used to update UI (e.g. for hiding or showing controls).
    * You should not update parameter objects using this method.
    * @param paramIdx The index of the parameter that changed */
   virtual void OnParamChangeUI(int paramIdx, EParamSource source = kUnknown) {};
   
-  /** Called when parameteres have changed to inform the plugin of the changes
+  /** Called when parameters have changed to inform the plugin of the changes
    * Override only if you need to handle notifications and updates in a specialist manner (e.g. if the ordering of updating parameters has an effect or if you need to avoid multiple settings of linked parameters). This must update both DSP and UI. The default implementation calls OnParamChange() and OnParamChangeUI() for each parameter.
    * @param source Specifies the source of the parameter changes */
   virtual void OnParamReset(EParamSource source)
@@ -256,7 +259,7 @@ public:
   /** If the editor changes UI dimensions, e.g. from clicking a button to choose a size or dragging a corner resizer, it needs to call into the plug-in API to resize the window in the plugin
    * returns a bool to indicate whether the DAW or plugin class has resized the host window */
   virtual bool EditorResizeFromUI(int viewWidth, int viewHeight, bool needsPlatformResize) { return false; }
-    
+
   /** SendMidiMsgFromUI (Abbreviation: SMMFUI)
    * This method should be used  when  sending a MIDI message from the UI. For example clicking on a key in a virtual keyboard.
    * Eventually the MIDI message can be handled in IPlugProcessor::ProcessMidiMsg(), from where it can be used to trigger sound and or forwarded to the API's MIDI output.
@@ -286,7 +289,7 @@ public:
 
 #pragma mark - Editor resizing
   void SetEditorSize(int width, int height) { mEditorWidth = width; mEditorHeight = height; }
-
+  
   /** \todo
    * @param widthLo \todo
    * @param widthHi \todo
@@ -305,6 +308,7 @@ public:
   
   /** @return The height of the plug-in editor in pixels */
   int GetEditorHeight() const { return mEditorHeight; }
+  
   int GetMinWidth() const { return mMinWidth; }
   int GetMaxWidth() const { return mMaxWidth; }
   int GetMinHeight() const { return mMinHeight; }
@@ -314,9 +318,9 @@ public:
    * @param w the incoming width value to test/set if clipping needed
    * @param h the incoming height value to test/set if clipping needed
    * @return \c true if the parameters fell withing the permitted range */
-  bool ConstrainEditorResize(int& w, int& h) const
+  virtual bool ConstrainEditorResize(int& w, int& h) const
   {
-    if (w >= mMinWidth && w <= mMaxWidth && h >= mMinHeight && h <= mMaxHeight)
+    if(w >= mMinWidth && w <= mMaxWidth && h >= mMinHeight && h <= mMaxHeight)
     {
       return true;
     }
@@ -340,13 +344,26 @@ public:
   virtual int UnserializeEditorState(const IByteChunk& chunk, int startPos)  { return startPos; }
   
   /** Can be used by a host API to inform the editor of screen scale changes
-   *@param scale The new screen scale*/
-  virtual void SetScreenScale(double scale) {}
+   * @param scale The new screen scale*/
+  virtual void SetScreenScale(float scale) {}
 
-protected:
+  friend class IPlugAPP;
+  friend class IPlugAAX;
+  friend class IPlugVST2;
+  friend class IPlugVST3;
+  friend class IPlugVST3Controller;
+  friend class IPlugVST3Processor;
+  friend class IPlugAU;
+  friend class IPlugAUv3;
+  friend class IPlugWEB;
+  friend class IPlugWAM;
+  friend class IPlugAPIBase;
+  friend class IPluginBase;
+
+private:
   /** A list of IParam objects. This list is populated in the delegate constructor depending on the number of parameters passed as an argument to MakeConfig() in the plug-in class implementation constructor */
   WDL_PtrList<IParam> mParams;
-private:
+
   /** The width of the plug-in editor in pixels. Can be updated by resizing, exists here for persistance, even if UI doesn't exist. */
   int mEditorWidth = 0;
   /** The height of the plug-in editor in pixels. Can be updated by resizing, exists here for persistance, even if UI doesn't exist */

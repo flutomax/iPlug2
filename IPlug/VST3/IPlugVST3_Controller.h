@@ -19,6 +19,7 @@
 #undef stricmp
 #undef strnicmp
 #include "public.sdk/source/vst/vsteditcontroller.h"
+#include "pluginterfaces/vst/ivstchannelcontextinfo.h"
 
 #include "IPlugAPIBase.h"
 
@@ -32,6 +33,7 @@ BEGIN_IPLUG_NAMESPACE
  *   @ingroup APIClasses */
 class IPlugVST3Controller : public Steinberg::Vst::EditControllerEx1
                           , public Steinberg::Vst::IMidiMapping
+                          , public Steinberg::Vst::ChannelContext::IInfoListener
                           , public IPlugAPIBase
                           , public IPlugVST3ControllerBase
 {
@@ -53,9 +55,7 @@ public:
   Steinberg::tresult PLUGIN_API setState(Steinberg::IBStream* pState) override;
   Steinberg::tresult PLUGIN_API getState(Steinberg::IBStream* pState) override;
   
-  
-  //https://github.com/iPlug2/iPlug2/issues/488
-  //Steinberg::Vst::ParamValue PLUGIN_API getParamNormalized (Steinberg::Vst::ParamID tag) override;
+  Steinberg::Vst::ParamValue PLUGIN_API getParamNormalized (Steinberg::Vst::ParamID tag) override;
   Steinberg::tresult PLUGIN_API setParamNormalized(Steinberg::Vst::ParamID tag, Steinberg::Vst::ParamValue value) override;
   // ComponentBase
   Steinberg::tresult PLUGIN_API notify(Steinberg::Vst::IMessage* message) override;
@@ -63,13 +63,45 @@ public:
   // IMidiMapping
   Steinberg::tresult PLUGIN_API getMidiControllerAssignment(Steinberg::int32 busIndex, Steinberg::int16 channel, Steinberg::Vst::CtrlNumber midiCCNumber, Steinberg::Vst::ParamID& tag) override;
 
-  // IEditControllerEx
-  Steinberg::tresult PLUGIN_API getProgramName(Steinberg::Vst::ProgramListID listId, Steinberg::int32 programIndex, Steinberg::Vst::String128 name /*out*/) override;
+  // IUnitInfo 
+  Steinberg::tresult PLUGIN_API getProgramName(Steinberg::Vst::ProgramListID listId, Steinberg::int32 programIndex, Steinberg::Vst::String128 name /*out*/) override
+  {
+    return GetProgramName(this, listId, programIndex, name);
+  }
   
+  Steinberg::int32 PLUGIN_API getProgramListCount() override
+  {
+    return GetProgramListCount(this);
+  }
+  
+  Steinberg::tresult PLUGIN_API getProgramListInfo(Steinberg::int32 listIndex, Steinberg::Vst::ProgramListInfo& info) override
+  {
+    return GetProgramListInfo(this, listIndex, info);
+  }
+  
+  // IInfoListener
+  Steinberg::tresult PLUGIN_API setChannelContextInfos(Steinberg::Vst::IAttributeList* list) override;
+
+  /** Get the color of the track that the plug-in is inserted on */
+  void GetTrackColor(int& r, int& g, int& b) override { r = (mChannelColor>>16)&0xff; g = (mChannelColor>>8)&0xff; b = mChannelColor&0xff; };
+
+  /** Get the name of the track that the plug-in is inserted on */
+  void GetTrackName(WDL_String& str) override { str = mChannelName; };
+
+  /** Get the index of the track that the plug-in is inserted on */
+  int GetTrackIndex() override { return mChannelIndex; };
+
+  /** Get the namespace of the track that the plug-in is inserted on */
+  void GetTrackNamespace(WDL_String& str) override { str = mChannelNamespace; };
+
+  /** Get the namespace index of the track that the plug-in is inserted on */
+  int GetTrackNamespaceIndex() override { return mChannelNamespaceIndex; };
+
   // Interface
   OBJ_METHODS(IPlugVST3Controller, EditControllerEx1)
   DEFINE_INTERFACES
-  DEF_INTERFACE(IMidiMapping)
+    DEF_INTERFACE(IMidiMapping)
+    DEF_INTERFACE(IInfoListener)
   END_DEFINE_INTERFACES(EditControllerEx1)
   REFCOUNT_METHODS(EditControllerEx1)
   
@@ -77,7 +109,7 @@ public:
   void BeginInformHostOfParamChange(int idx) override { beginEdit(idx); }
   void InformHostOfParamChange(int idx, double normalizedValue) override  { performEdit(idx, normalizedValue); }
   void EndInformHostOfParamChange(int idx) override  { endEdit(idx); }
-  void InformHostOfProgramChange() override  { /* TODO: */}
+  void InformHostOfPresetChange() override  { /* TODO: */}
   bool EditorResize(int viewWidth, int viewHeight) override;
   void DirtyParametersFromUI() override;
   
@@ -85,6 +117,7 @@ public:
   void SendMidiMsgFromUI(const IMidiMsg& msg) override;
   void SendSysexMsgFromUI(const ISysEx& msg) override;
   void SendArbitraryMsgFromUI(int msgTag, int ctrlTag = kNoTag, int dataSize = 0, const void* pData = nullptr) override;
+  void SendParameterValueFromUI(int paramIdx, double normalisedValue) override;
 
   Steinberg::Vst::IComponentHandler* GetComponentHandler() const { return componentHandler; }
   ViewType* GetView() const { return mView; }

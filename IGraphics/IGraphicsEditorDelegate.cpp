@@ -59,10 +59,10 @@ void IGEditorDelegate::CloseWindow()
   }
 }
 
-void IGEditorDelegate::SetScreenScale(double scale)
-{    
+void IGEditorDelegate::SetScreenScale(float scale)
+{
   if (GetUI())
-    mGraphics->SetScreenScale(static_cast<int>(std::round(scale)));
+    mGraphics->SetScreenScale(scale);
 }
 
 void IGEditorDelegate::SendControlValueFromDelegate(int ctrlTag, double normalizedValue)
@@ -70,17 +70,13 @@ void IGEditorDelegate::SendControlValueFromDelegate(int ctrlTag, double normaliz
   if(!mGraphics)
     return;
 
-  if (ctrlTag > kNoTag)
+  IControl* pControl = mGraphics->GetControlWithTag(ctrlTag);
+  
+  assert(pControl);
+  
+  if(pControl)
   {
-    for (auto c = 0; c < mGraphics->NControls(); c++)
-    {
-      IControl* pControl = mGraphics->GetControl(c);
-      
-      if (pControl->GetTag() == ctrlTag)
-      {
-        pControl->SetValueFromDelegate(normalizedValue);
-      }
-    }
+    pControl->SetValueFromDelegate(normalizedValue);
   }
 }
 
@@ -89,17 +85,13 @@ void IGEditorDelegate::SendControlMsgFromDelegate(int ctrlTag, int msgTag, int d
   if(!mGraphics)
     return;
   
-  if (ctrlTag > kNoTag)
+  IControl* pControl = mGraphics->GetControlWithTag(ctrlTag);
+  
+  assert(pControl);
+  
+  if(pControl)
   {
-    for (auto c = 0; c < mGraphics->NControls(); c++)
-    {
-      IControl* pControl = mGraphics->GetControl(c);
-      
-      if (pControl->GetTag() == ctrlTag)
-      {
-        pControl->OnMsgFromDelegate(msgTag, dataSize, pData);
-      }
-    }
+    pControl->OnMsgFromDelegate(msgTag, dataSize, pData);
   }
 }
 
@@ -157,10 +149,10 @@ bool IGEditorDelegate::SerializeEditorSize(IByteChunk& data) const
   int height = mGraphics ? mGraphics->Height() : mLastHeight;
   float scale = mGraphics ? mGraphics->GetDrawScale() : mLastScale;
     
-  savedOK &= data.Put(&width);
-  savedOK &= data.Put(&height);
-  savedOK &= data.Put(&scale);
-    
+  savedOK &= (data.Put(&width) > 0);
+  savedOK &= (data.Put(&height) > 0);
+  savedOK &= (data.Put(&scale) > 0);
+
   return savedOK;
 }
 
@@ -187,46 +179,6 @@ int IGEditorDelegate::UnserializeEditorSize(const IByteChunk& data, int startPos
   }
     
   return startPos;
-}
-
-void IGEditorDelegate::OnParamChangeUI(int paramIdx, EParamSource source)
-{
-  // For the host automation case
-  if (source == kHost)
-  {
-    IGraphics* pGraphics = GetUI();
-    if (pGraphics != NULL)
-    {
-      for (int c = 0; c < pGraphics->NControls(); c++)
-      {
-        IControl* control = pGraphics->GetControl(c);
-        if (control != NULL)
-        {
-          // One control can have several params
-          for (int i = 0; i < control->NVals(); i++)
-          {
-            int idx = control->GetParamIdx(i);
-            if (idx == paramIdx)
-            {
-              double value = GetParam(idx)->GetNormalized();
-              if (!control->IsDisabled()) // Dont animate disabled controls
-              {
-                control->SetValue(value, i);
-                control->SetDirty(false);
-              }
-            }
-            // Don't break here in case we have several controls with the same param
-          }
-        }
-      }
-    }
-  }
-}
-
-void IGEditorDelegate::ResetLastEditorSize()
-{
-  mLastWidth = 0;
-  mLastHeight = 0;
 }
 
 bool IGEditorDelegate::SerializeEditorState(IByteChunk& chunk) const

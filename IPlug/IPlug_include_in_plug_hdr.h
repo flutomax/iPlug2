@@ -97,13 +97,24 @@ END_IPLUG_NAMESPACE
 #ifdef OS_WIN
   #define EXPORT __declspec(dllexport)
   #define BUNDLE_ID ""
-#elif defined OS_MAC || defined OS_IOS
+  #define APP_GROUP_ID ""
+#elif defined OS_MAC
   #define BUNDLE_ID BUNDLE_DOMAIN "." BUNDLE_MFR "." API_EXT "." BUNDLE_NAME API_EXT2
+  #if !defined APP_GROUP_ID
+  #define APP_GROUP_ID "group." BUNDLE_DOMAIN "." BUNDLE_MFR "." BUNDLE_NAME
+  #endif
+  #define EXPORT __attribute__ ((visibility("default")))
+#elif defined OS_IOS
+  #define BUNDLE_ID BUNDLE_DOMAIN "." BUNDLE_MFR "." BUNDLE_NAME API_EXT2
+  #if !defined APP_GROUP_ID
+  #define APP_GROUP_ID "group." BUNDLE_DOMAIN "." BUNDLE_MFR "." BUNDLE_NAME
+  #endif
   #define EXPORT __attribute__ ((visibility("default")))
 #elif defined OS_LINUX
   //TODO:
 #elif defined OS_WEB
   #define BUNDLE_ID ""
+  #define APP_GROUP_ID ""
 #else
   #error "No OS defined!"
 #endif
@@ -204,6 +215,22 @@ END_IPLUG_NAMESPACE
 #ifndef PLUG_HEIGHT
   #pragma message WARN("PLUG_HEIGHT not defined, setting to 500px")
   #define PLUG_HEIGHT 500
+#endif
+
+#ifndef PLUG_MIN_WIDTH
+  #define PLUG_MIN_WIDTH (PLUG_WIDTH / 3)
+#endif
+
+#ifndef PLUG_MIN_HEIGHT
+  #define PLUG_MIN_HEIGHT (PLUG_HEIGHT / 3)
+#endif
+
+#ifndef PLUG_MAX_WIDTH
+  #define PLUG_MAX_WIDTH (PLUG_WIDTH * 3)
+#endif
+
+#ifndef PLUG_MAX_HEIGHT
+  #define PLUG_MAX_HEIGHT (PLUG_HEIGHT * 3)
 #endif
 
 #ifndef PLUG_FPS

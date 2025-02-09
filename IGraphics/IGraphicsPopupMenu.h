@@ -50,8 +50,7 @@ public:
       kDisabled = 1 << 0,     // item is gray and not selectable
       kTitle    = 1 << 1,     // item indicates a title and is not selectable
       kChecked  = 1 << 2,     // item has a checkmark
-      kSeparator  = 1 << 3,   // item is a separator
-      kRadio    = 1 << 4			// Z: item has radiobutton 
+      kSeparator  = 1 << 3    // item is a separator
     };
     
     Item(const char* str, int flags = kNoFlags, int tag = -1)
@@ -62,8 +61,8 @@ public:
     }
     
     Item (const char* str, IPopupMenu* pSubMenu)
-    : mFlags(kNoFlags)
-    , mSubmenu(pSubMenu)
+    : mSubmenu(pSubMenu)
+    , mFlags(kNoFlags)
     {
       SetText(str);
     }
@@ -80,7 +79,6 @@ public:
     
     bool GetEnabled() const { return !(mFlags & kDisabled); }
     bool GetChecked() const { return (mFlags & kChecked) != 0; }
-    bool GetRadio() const { return (mFlags & kRadio) != 0; }
     bool GetIsTitle() const { return (mFlags & kTitle) != 0; }
     bool GetIsSeparator() const { return (mFlags & kSeparator) != 0; }
     int GetTag() const { return mTag; }
@@ -97,8 +95,8 @@ public:
     
     void SetEnabled(bool state) { SetFlag(kDisabled, !state); }
     void SetChecked(bool state) { SetFlag(kChecked, state); }
-    void SetRadio(bool state) { SetFlag(kRadio, state); }
     void SetTitle(bool state) {SetFlag(kTitle, state); }
+    void SetSubmenu(IPopupMenu* pSubmenu) { mSubmenu.reset(pSubmenu); }
 
   protected:
     void SetFlag(Flags flag, bool state)
@@ -221,6 +219,24 @@ public:
   void SetNItemsPerColumn(int nItemsPerColumn) { mNItemsPerColumn = nItemsPerColumn; }
   int GetPrefix() const { return mPrefix; }
   bool GetCanMultiCheck() const { return mCanMultiCheck; }
+  
+  bool HasSubMenus()
+  {
+    int n = mMenuItems.GetSize();
+    
+    for (int i = 0; i < n; i++)
+    {
+      IPopupMenu::Item* pItem = GetItem(i);
+      IPopupMenu* pSubmenu = pItem->GetSubmenu();
+
+      if (pSubmenu)
+      {
+        return true;
+      }
+    }
+    
+    return false;
+  }
 
   Item* GetItem(int index)
   {
@@ -235,18 +251,10 @@ public:
       return nullptr;
     }
   }
-
-  Item* GetItemByTag(int Tag)
+  
+  int GetIndexOfItem(Item* pItem) const
   {
-    Item* result = nullptr;
-    int nItems = NItems();
-    for (int i = 0; i < nItems; ++i)
-    {
-      result = mMenuItems.Get(i);
-      if (result && result->GetTag() == Tag)
-        return result;
-    }
-    return nullptr;
+    return mMenuItems.Find(pItem);
   }
   
   Item* GetChosenItem()
@@ -275,8 +283,9 @@ public:
 
   void Clear(bool resetEverything = true)
   {
-    if(resetEverything)
+    if (resetEverything)
     {
+      SetChosenItemIdx(-1);
       SetPrefix(0);
       mCanMultiCheck = false;
     }
@@ -301,6 +310,39 @@ public:
     for (int i = 0; i < mMenuItems.GetSize(); i++)
     {
       mMenuItems.Get(i)->SetChecked(i == index);
+    }
+  }
+
+  void CheckItemWithText(const char* str, bool state = true)
+  {
+    for (int i = 0; i < mMenuItems.GetSize(); i++)
+    {
+      if (strcmp(mMenuItems.Get(i)->GetText(), str) == 0)
+      {
+        mMenuItems.Get(i)->SetChecked(state);
+        break;
+      }
+    }
+  }
+  
+  void CheckItemAlone(Item* pItemToCheck)
+  {
+    int n = mMenuItems.GetSize();
+    
+    for (int i = 0; i < n; i++)
+    {
+      IPopupMenu::Item* pItem = GetItem(i);
+      pItem->SetChecked(false);
+      IPopupMenu* pSubmenu = pItem->GetSubmenu();
+      
+      if (pSubmenu)
+      {
+        pSubmenu->CheckItemAlone(pItemToCheck);
+      }
+      else if (pItem == pItemToCheck)
+      {
+        pItem->SetChecked(true);
+      }
     }
   }
   

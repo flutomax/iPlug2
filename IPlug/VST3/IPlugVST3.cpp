@@ -29,6 +29,7 @@ using namespace Vst;
 IPlugVST3::IPlugVST3(const InstanceInfo& info, const Config& config)
 : IPlugAPIBase(config, kAPIVST3)
 , IPlugVST3ProcessorBase(config, *this)
+, IPlugVST3ControllerBase(parameters)
 , mView(nullptr)
 {
   CreateTimer();
@@ -45,7 +46,7 @@ tresult PLUGIN_API IPlugVST3::initialize(FUnknown* context)
   if (SingleComponentEffect::initialize(context) == kResultOk)
   {
     IPlugVST3ProcessorBase::Initialize(this);
-    IPlugVST3ControllerBase::Initialize(this, parameters, IsInstrument(), DoesMIDIIn());
+    IPlugVST3ControllerBase::Initialize(this, IsInstrument(), DoesMIDIIn());
 
     IPlugVST3GetHost(this, context);
     OnHostIdentified();
@@ -67,9 +68,8 @@ tresult PLUGIN_API IPlugVST3::terminate()
 tresult PLUGIN_API IPlugVST3::setBusArrangements(SpeakerArrangement* pInputBusArrangements, int32 numInBuses, SpeakerArrangement* pOutputBusArrangements, int32 numOutBuses)
 {
   TRACE
-
-  SetBusArrangements(pInputBusArrangements, numInBuses, pOutputBusArrangements, numOutBuses);
-  return kResultTrue;
+ 
+  return IPlugVST3ProcessorBase::SetBusArrangements(this, pInputBusArrangements, numInBuses, pOutputBusArrangements, numOutBuses) ? kResultTrue : kResultFalse;
 }
 
 tresult PLUGIN_API IPlugVST3::setActive(TBool state)
@@ -122,32 +122,28 @@ tresult PLUGIN_API IPlugVST3::getState(IBStream* pState)
 }
 
 #pragma mark IEditController overrides
-
-//https://github.com/iPlug2/iPlug2/issues/488
-//ParamValue PLUGIN_API IPlugVST3::getParamNormalized(ParamID tag)
-//{
-//  if (tag >= kBypassParam)
-//    return EditControllerEx1::getParamNormalized(tag);
-//
-//  return IPlugVST3ControllerBase::GetParamNormalized(this, tag);
-//}
+ParamValue PLUGIN_API IPlugVST3::getParamNormalized(ParamID tag)
+{
+  return IPlugVST3ControllerBase::GetParamNormalized(tag);
+}
 
 tresult PLUGIN_API IPlugVST3::setParamNormalized(ParamID tag, ParamValue value)
 {
-  IPlugVST3ControllerBase::SetParamNormalized(this, tag, value);
-  
-  return EditControllerEx1::setParamNormalized(tag, value);
+  if (IPlugVST3ControllerBase::SetParamNormalized(this, tag, value))
+    return kResultTrue;
+  else
+    return kResultFalse;
 }
 
 IPlugView* PLUGIN_API IPlugVST3::createView(const char* name)
 {
-  if (name && strcmp(name, "editor") == 0)
+  if (HasUI() && name && strcmp(name, "editor") == 0)
   {
     mView = new ViewType(*this);
     return mView;
   }
   
-  return 0;
+  return nullptr;
 }
 
 tresult PLUGIN_API IPlugVST3::setEditorState(IBStream* pState)
@@ -172,13 +168,20 @@ tresult PLUGIN_API IPlugVST3::setComponentState(IBStream* pState)
 
 tresult PLUGIN_API IPlugVST3::getMidiControllerAssignment(int32 busIndex, int16 midiChannel, CtrlNumber midiCCNumber, ParamID& tag)
 {
-  if (busIndex == 0)
+  if (busIndex == 0 && midiChannel < VST3_NUM_CC_CHANS)
   {
     tag = kMIDICCParamStartIdx + (midiChannel * kCountCtrlNumber) + midiCCNumber;
     return kResultTrue;
   }
 
   return kResultFalse;
+}
+
+#pragma mark IInfoListener overrides
+
+Steinberg::tresult PLUGIN_API IPlugVST3::setChannelContextInfos(Steinberg::Vst::IAttributeList* pList)
+{
+  return IPlugVST3ControllerBase::SetChannelContextInfos(pList) ? kResultTrue : kResultFalse;
 }
 
 #pragma mark IPlugAPIBase overrides
@@ -203,7 +206,7 @@ void IPlugVST3::EndInformHostOfParamChange(int idx)
 
 void IPlugVST3::InformHostOfParameterDetailsChange()
 {
-  FUnknownPtr<IComponentHandler>handler(componentHandler);
+  FUnknownPtr<IComponentHandler> handler(componentHandler);
   handler->restartComponent(kParamTitlesChanged);
 }
 
@@ -212,7 +215,7 @@ bool IPlugVST3::EditorResize(int viewWidth, int viewHeight)
   if (HasUI())
   {
     if (viewWidth != GetEditorWidth() || viewHeight != GetEditorHeight())
-      mView->resize(viewWidth, viewHeight);
+      mView->Resize(viewWidth, viewHeight);
 
     SetEditorSize(viewWidth, viewHeight);
   }
@@ -220,17 +223,37 @@ bool IPlugVST3::EditorResize(int viewWidth, int viewHeight)
   return true;
 }
 
+#pragma mark IEditorDelegate overrides
+
 void IPlugVST3::DirtyParametersFromUI()
 {
+  for (int i = 0; i < NParams(); i++)
+    IPlugVST3ControllerBase::SetVST3ParamNormalized(i, GetParam(i)->GetNormalized());
+  
   startGroupEdit();
   IPlugAPIBase::DirtyParametersFromUI();
   finishGroupEdit();
 }
 
+void IPlugVST3::SendParameterValueFromUI(int paramIdx, double normalisedValue)
+{
+  IPlugVST3ControllerBase::SetVST3ParamNormalized(paramIdx, normalisedValue);
+  IPlugAPIBase::SendParameterValueFromUI(paramIdx, normalisedValue);
+}
+
 void IPlugVST3::SetLatency(int latency)
 {
+  // N.B. set the latency even if the handler is not yet set
+  
   IPlugProcessor::SetLatency(latency);
 
-  FUnknownPtr<IComponentHandler>handler(componentHandler);
-  handler->restartComponent(kLatencyChanged);
+  if (componentHandler)
+  {
+    FUnknownPtr<IComponentHandler> handler(componentHandler);
+
+    if (handler)
+    {
+      handler->restartComponent(kLatencyChanged);
+    }
+  }
 }

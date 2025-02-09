@@ -58,10 +58,10 @@ public:
    * @return \c true in order to indicate that the states are equal. */
   virtual bool CompareState(const uint8_t* pIncomingState, int startPos) const;
 
-  /* implement this and return true to trigger your custom about box, when someone clicks about in the menu of a standalone app or VST3 plugin */
+  /* Implement this and return true to trigger your custom about box, when someone clicks about in the menu of a standalone app or VST3 plugin */
   virtual bool OnHostRequestingAboutBox() { return false; }
 
-  /* implement this and return true to trigger your custom help info, when someone clicks help in the menu of a standalone app or VST3 plugin */
+  /* Implement this and return true to trigger your custom help info, when someone clicks help in the menu of a standalone app or VST3 plugin */
   virtual bool OnHostRequestingProductHelp() { return false; }
   
   /** Implement this to do something specific when IPlug becomes aware of the particular host that is hosting the plug-in.
@@ -77,7 +77,11 @@ public:
    * @param width The width the host offers
    * @param height The height the host offers
    * @return return \c true if your plug-in supports these dimensions */
-  virtual bool OnHostRequestingSupportedViewConfiguration(int width, int height) { return true; }
+  virtual bool OnHostRequestingSupportedViewConfiguration(int width, int height)
+  {
+    // Logic/GB offer one option with 0w, 0h, and if we allow that, our AUv3 has "our" size as its 100% setting
+    return ((width + height) == 0);
+  }
   
   /** Called by some AUv3 plug-in hosts when a particular UI size is selected
    * @param width The selected width
@@ -107,9 +111,6 @@ public:
   virtual void OnIdle() {}
     
 #pragma mark - Methods you can call - some of which have custom implementations in the API classes, some implemented in IPlugAPIBase.cpp
-  /** Helper method, used to print some info to the console in debug builds. Can be overridden in other IPlugAPIBases, for specific functionality, such as printing UI details. */
-  virtual void PrintDebugInfo() const;
-
   /** SetParameterValue is called from the UI in the middle of a parameter change gesture (possibly via delegate) in order to update a parameter's value.
    * It will update mParams[paramIdx], call InformHostOfParamChange and IPlugAPIBase::OnParamChange();
    * @param paramIdx The index of the parameter that changed
@@ -117,12 +118,22 @@ public:
   void SetParameterValue(int paramIdx, double normalizedValue);
   
   /** Get the color of the track that the plug-in is inserted on */
-  virtual void GetTrackColor(int& r, int& g, int& b) {};
+  virtual void GetTrackColor(int& r, int& g, int& b) { r = 0; g = 0; b = 0; }
 
   /** Get the name of the track that the plug-in is inserted on */
-  virtual void GetTrackName(WDL_String& str) {};
-  
-  /** /todo */
+  virtual void GetTrackName(WDL_String& str) {}
+
+  /** Get the index of the track that the plug-in is inserted on */
+  virtual int GetTrackIndex() { return 0; }
+
+  /** Get the namespace of the track that the plug-in is inserted on */
+  virtual void GetTrackNamespace(WDL_String& str) {}
+
+  /** Get the namespace index of the track that the plug-in is inserted on */
+  virtual int GetTrackNamespaceIndex() { return 0; }
+
+  /** In a distributed VST3 or WAM plugin, if you modify the parameters on the UI side (e.g. recall preset in custom preset browser), 
+   * you can call this to update the parameters on the DSP side */
   virtual void DirtyParametersFromUI() override;
 
 #pragma mark - Methods called by the API class - you do not call these methods in your plug-in class
@@ -171,37 +182,48 @@ public:
     mSysExDataFromEditor.Push(data);
   }
 
-  /** /todo */
+  /** Called by the API class to create the timer that pumps the parameter/message queues */
   void CreateTimer();
   
 private:
   /** Implementations call into the APIs resize hooks
    * returns a bool to indicate whether the DAW or plugin class has resized the host window */
-  virtual bool EditorResize(int width, int height);
+  virtual bool EditorResize(int width, int height) { return false; }
   
   /** Implemented by the API class, called by the UI (or by a delegate) at the beginning of a parameter change gesture
    * @param paramIdx The parameter that is being changed */
-  virtual void BeginInformHostOfParamChange(int paramIdx) {};
+  virtual void BeginInformHostOfParamChange(int paramIdx) {}
 
   /** Implemented by the API class, called by the UI (or by a delegate) at the end of a parameter change gesture
    * @param paramIdx The parameter that is being changed */
-  virtual void EndInformHostOfParamChange(int paramIdx) {};
+  virtual void EndInformHostOfParamChange(int paramIdx) {}
 
   /** Implemented by the API class, called by the UI via SetParameterValue() with the value of a parameter change gesture
    * @param paramIdx The parameter that is being changed
    * @param normalizedValue The new normalised value of the parameter being changed */
-  virtual void InformHostOfParamChange(int paramIdx, double normalizedValue) {};
+  virtual void InformHostOfParamChange(int paramIdx, double normalizedValue) {}
   
   //DISTRIBUTED ONLY (Currently only VST3)
-  /** /todo */
-  virtual void TransmitMidiMsgFromProcessor(const IMidiMsg& msg) {};
+  /** \todo */
+  virtual void TransmitMidiMsgFromProcessor(const IMidiMsg& msg) {}
   
-  /** /todo */
-  virtual void TransmitSysExDataFromProcessor(const SysExData& data) {};
+  /** \todo */
+  virtual void TransmitSysExDataFromProcessor(const SysExData& data) {}
 
   void OnTimer(Timer& t);
 
-protected:
+  friend class IPlugAPP;
+  friend class IPlugAAX;
+  friend class IPlugVST2;
+  friend class IPlugVST3;
+  friend class IPlugVST3Controller;
+  friend class IPlugVST3Processor;
+  friend class IPlugAU;
+  friend class IPlugAUv3;
+  friend class IPlugWEB;
+  friend class IPlugWAM;
+
+private:
   WDL_String mParamDisplayStr;
   std::unique_ptr<Timer> mTimer;
   

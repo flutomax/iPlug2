@@ -12,6 +12,8 @@
 
 /**
  * @file
+ * @ingroup IControls
+ * @copydoc IVDisplayControl
  */
 
 #include "IControl.h"
@@ -20,34 +22,27 @@
 BEGIN_IPLUG_NAMESPACE
 BEGIN_IGRAPHICS_NAMESPACE
 
-/**  */
+/** A control to display a rolling graphics of historical values */
 class IVDisplayControl : public IControl
                        , public IVectorBase
 {
 public:
   static constexpr int MAX_BUFFER_SIZE = 2048;
   
-  IVDisplayControl(const IRECT& bounds, const char* label = "", const IVStyle& style = DEFAULT_STYLE, EDirection dir = EDirection::Vertical, float lo = 0., float hi = 1.f, float defaultVal = 0., uint32_t bufferSize = 100, float strokeThickness = 2.f)
+  IVDisplayControl(const IRECT& bounds, const char* label = "", const IVStyle& style = DEFAULT_STYLE, EDirection dir = EDirection::Horizontal, float lo = 0., float hi = 1.f, float defaultVal = 0., uint32_t bufferSize = 100, float strokeThickness = 2.f)
   : IControl(bounds)
   , IVectorBase(style)
+  , mBuffer(bufferSize, defaultVal)
   , mLoValue(lo)
   , mHiValue(hi)
-  , mBuffer(bufferSize, defaultVal)
-  , mDirection(dir)
   , mStrokeThickness(strokeThickness)
+  , mDirection(dir)
   {
     assert(bufferSize > 0 && bufferSize < MAX_BUFFER_SIZE);
 
     AttachIControl(this, label);
   }
 
-  void Update(float v)
-  {
-    mBuffer[mReadPos] = v;
-    mReadPos = (mReadPos+1) % mBuffer.size();
-    SetDirty(false);
-  }
-  
   void OnResize() override
   {
     SetTargetRECT(MakeRects(mRECT));
@@ -62,7 +57,7 @@ public:
   
   void Draw(IGraphics& g) override
   {
-    DrawBackGround(g, mRECT);
+    DrawBackground(g, mRECT);
     DrawWidget(g);
     DrawLabel(g);
     
@@ -107,14 +102,19 @@ public:
         g.PathLineTo(vx, vy);
       }
     }
-    
-    g.PathClipRegion();
-    
-    g.PathStroke(IPattern::CreateLinearGradient(mPlotBounds, mDirection, {{COLOR_TRANSPARENT, 0.f}, {GetColor(kX1), 1.f}}), mStrokeThickness, IStrokeOptions(), &mBlend);
+    IStrokeOptions strokeOptions;
+    strokeOptions.mJoinOption = ELineJoin::Bevel;
+    g.PathStroke(IPattern::CreateLinearGradient(mPlotBounds, mDirection, {{COLOR_TRANSPARENT, 0.f}, {GetColor(kX1), 1.f}}), mStrokeThickness, strokeOptions, &mBlend);
   }
   
   void OnMsgFromDelegate(int msgTag, int dataSize, const void* pData) override
   {
+    auto Update = [&](float v) {
+      mBuffer[mReadPos] = v;
+      mReadPos = (mReadPos+1) % mBuffer.size();
+      SetDirty(false);
+    };
+
     if (!IsDisabled() && msgTag == ISender<>::kUpdateMessage)
     {
       IByteStream stream(pData, dataSize);
@@ -123,7 +123,6 @@ public:
       ISenderData<1> d;
       pos = stream.Get(&d, pos);
       Update(d.vals[0]);
-      SetDirty(false);
     }
   }
   

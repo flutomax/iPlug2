@@ -164,7 +164,7 @@ public:
 	virtual void getErrorMessage(char *string);
 	virtual ASIOError start();
 	virtual ASIOError stop();
-	virtual ASIOError getChannels(long *numInputChannels, long *numOutputChannels);
+	virtual ASIOError GetChannels(long *numInputChannels, long *numOutputChannels);
 	virtual ASIOError getLatencies(long *inputLatency, long *outputLatency);
 	virtual ASIOError getBufferSize(long *minSize, long *maxSize, long *preferredSize, long *granularity);
 	virtual ASIOError canSampleRate(ASIOSampleRate sampleRate);
