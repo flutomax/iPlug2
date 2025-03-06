@@ -544,10 +544,12 @@ static CVReturn displayLinkCallback(CVDisplayLinkRef displayLink, const CVTimeSt
 
 - (void) viewDidChangeEffectiveAppearance
 {
+#if __clang_major__ > 8
   if (@available(macOS 10.14, *)) {
     BOOL isDarkMode = [[[self effectiveAppearance] name] isEqualToString: (NSAppearanceNameDarkAqua)];
     mGraphics->OnAppearanceChanged(isDarkMode ? EUIAppearance::Dark : EUIAppearance::Light);
   }
+#endif
 }
 
 - (BOOL) acceptsFirstResponder

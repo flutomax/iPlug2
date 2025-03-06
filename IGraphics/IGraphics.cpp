@@ -1504,7 +1504,14 @@ void IGraphics::OnGUIIdle()
 void IGraphics::OnLostFocus()
 {
   TRACE
-  ForAllControls(&IControl::OnLostFocus);
+  try
+  {
+    ForAllControls(&IControl::OnLostFocus);
+  }
+  catch (...)
+  {
+    return;
+  }
 }
 
 void IGraphics::OnDragResize(float x, float y)

@@ -684,6 +684,7 @@ struct IText
     , mAngle(angle)
     , mAlign(align)
     , mVAlign(valign)
+    , mAliasing(false)
   {
     strcpy(mFont, (fontID ? fontID : DEFAULT_FONT));
   }
@@ -738,6 +739,7 @@ struct IText
   float mAngle = 0.f; // Degrees ccwise from normal.
   EAlign mAlign = EAlign::Near;
   EVAlign mVAlign = EVAlign::Middle;
+  bool mAliasing;
 };
 
 const IText DEFAULT_TEXT = IText();

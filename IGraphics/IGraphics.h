@@ -1572,9 +1572,6 @@ public:
 
   /** This is an idle timer tick call on the GUI thread, only active if USE_IDLE_CALLS is defined */
   void OnGUIIdle();
-
-  /** Called on lost focus plugin window */
-  void OnLostFocus();
   
   /** Called by ICornerResizerControl as the corner is dragged to resize */
   void OnDragResize(float x, float y);
@@ -1582,6 +1579,12 @@ public:
   /** Called by the platform class if the view changes to dark/light mode
    * @param appearance Light/Dark mode */
   void OnAppearanceChanged(EUIAppearance appearance);
+  
+  /** Called on lost focus plugin window */
+  void OnLostFocus();
+  
+  /** Check focus (Apple only) */
+  virtual void CheckFocus() {}
   
   /** Get the UI Appearance (Light/Dark mode)
    * @return Light/Dark mode */

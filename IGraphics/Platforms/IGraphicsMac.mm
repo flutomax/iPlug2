@@ -19,6 +19,41 @@
 using namespace iplug;
 using namespace igraphics;
 
+bool isMenuOpen = false;
+
+void menuDidBeginTracking(NSNotification* notification)
+{
+  NSMenu* menu = [notification object];
+  if (menu)
+    isMenuOpen = true;
+}
+
+void menuDidEndTracking(NSNotification* notification)
+{
+  NSMenu* menu = [notification object];
+  if (menu)
+    isMenuOpen = false;
+}
+
+void StartNotifyMenu()
+{
+  
+  [[NSNotificationCenter defaultCenter] addObserverForName:NSMenuDidBeginTrackingNotification
+                                                    object:nil
+                                                     queue:[NSOperationQueue mainQueue]
+                                                usingBlock:^(NSNotification* note) {
+                                                  menuDidBeginTracking(note);
+                                                }];
+  
+  [[NSNotificationCenter defaultCenter] addObserverForName:NSMenuDidEndTrackingNotification
+                                                    object:nil
+                                                     queue:[NSOperationQueue mainQueue]
+                                                usingBlock:^(NSNotification* note) {
+                                                  menuDidEndTracking(note);
+                                                }];
+  
+}
+
 static int GetSystemVersion()
 {
   static int32_t v;
@@ -51,6 +86,7 @@ IGraphicsMac::IGraphicsMac(IGEditorDelegate& dlg, int w, int h, int fps, float s
   NSApplicationLoad();
   StaticStorage<CoreTextFontDescriptor>::Accessor storage(sFontDescriptorCache);
   storage.Retain();
+  StartNotifyMenu();
 }
 
 IGraphicsMac::~IGraphicsMac()
@@ -153,6 +189,37 @@ void IGraphicsMac::CloseWindow()
 bool IGraphicsMac::WindowIsOpen()
 {
   return mView;
+}
+
+void IGraphicsMac::CheckFocus()
+{
+  if (!mView)
+    return;
+  void* kwnd = nullptr;
+  NSWindow *window = [NSApp keyWindow];
+  if (window)
+  {
+    id ret = [window firstResponder];
+    if (ret && [ret isKindOfClass:[NSView class]])
+    {
+      if ([ret isKindOfClass:[NSTextView class]] && [ret superview] && [[ret superview] superview])
+      {
+        NSView* v = [[ret superview] superview];
+        if ([v isKindOfClass:[NSTextField class]])
+          kwnd = v;
+      }
+      else
+        kwnd = ret;
+    }
+  }
+  
+  const bool focused = (kwnd == GetWindow()) && !isMenuOpen;
+  if (fFocused != focused)
+  {
+    fFocused = focused;
+    if (!fFocused)
+      OnLostFocus();
+  }
 }
 
 void IGraphicsMac::PlatformResize(bool parentHasResized)
@@ -283,79 +350,153 @@ void IGraphicsMac::GetMouseLocation(float& x, float&y) const
   ScreenToPoint(x, y);
 }
 
-EMsgBoxResult IGraphicsMac::ShowMessageBox(const char* str, const char* title, EMsgBoxType type, IMsgBoxCompletionHandlerFunc completionHandler)
+EMsgBoxResult IGraphicsMac::ShowMessageBox(const char* str, const char* title, EMsgBoxType type, EMsgBoxIcon icon, IMsgBoxCompletionHandlerFunc completionHandler)
 {
   ReleaseMouseCapture();
-
-  NSString* messageContent = @(str ? str : "");
-  NSString* alertTitle = @(title ? title : "");
   
-  NSAlert* alert = [[NSAlert alloc] init];
-  [alert setMessageText:alertTitle];
-  [alert setInformativeText:messageContent];
+  long result = (long) kCANCEL;
   
-  EMsgBoxResult result = kCANCEL;
+  if (!str) str= "";
+  if (!title) title= "";
+  
+  //convert the strings from char* to CFStringRef
+  CFStringRef header_ref = CFStringCreateWithCString(NULL, title, kCFStringEncodingUTF8);
+  CFStringRef message_ref = CFStringCreateWithCString( NULL, str, kCFStringEncodingUTF8);
+  
+  CFOptionFlags flgresult, icont;  //result code from the message box
+  switch (icon)
+  {
+    case kMB_ICONHAND:
+      icont = kCFUserNotificationStopAlertLevel;
+      break;
+    case kMB_ICONEXCLAMATION:
+      icont = kCFUserNotificationCautionAlertLevel;
+      break;
+    default:
+      icont = kCFUserNotificationPlainAlertLevel;
+      break;
+  }
+  
   
   switch (type)
   {
     case kMB_OK:
-      [alert addButtonWithTitle:@"OK"];
+      CFUserNotificationDisplayAlert(
+                                     0, // no timeout
+                                     icont, //change it depending message_type flags ( MB_ICONASTERISK.... etc.)
+                                     NULL, //icon url, use default, you can change it depending message_type flags
+                                     NULL, //not used
+                                     NULL, //localization of strings
+                                     header_ref, //header text
+                                     message_ref, //message text
+                                     CFSTR("OK"), //default "ok" text in button
+                                     NULL, //alternate button title
+                                     NULL, //other button title, null--> no other button
+                                     &flgresult //response flags
+                                     );
       result = kOK;
       break;
     case kMB_OKCANCEL:
-      [alert addButtonWithTitle:@"OK"];
-      [alert addButtonWithTitle:@"Cancel"];
-      result = kCANCEL;
+      
+      CFUserNotificationDisplayAlert(
+                                     0, // no timeout
+                                     icont, //change it depending message_type flags ( MB_ICONASTERISK.... etc.)
+                                     NULL, //icon url, use default, you can change it depending message_type flags
+                                     NULL, //not used
+                                     NULL, //localization of strings
+                                     header_ref, //header text
+                                     message_ref, //message text
+                                     CFSTR("OK"), //default "ok" text in button
+                                     CFSTR("Cancel"), //alternate button title
+                                     NULL, //other button title, null--> no other button
+                                     &flgresult //response flags
+                                     );
+      if (flgresult == kCFUserNotificationDefaultResponse )
+        result = kOK;
+      else
+        result = kCANCEL;
       break;
     case kMB_YESNO:
-      [alert addButtonWithTitle:@"Yes"];
-      [alert addButtonWithTitle:@"No"];
-      result = kNO;
+      CFUserNotificationDisplayAlert(
+                                     0, // no timeout
+                                     icont, //change it depending message_type flags ( MB_ICONASTERISK.... etc.)
+                                     NULL, //icon url, use default, you can change it depending message_type flags
+                                     NULL, //not used
+                                     NULL, //localization of strings
+                                     header_ref, //header text
+                                     message_ref, //message text
+                                     CFSTR("Yes"), //default "ok" text in button
+                                     CFSTR("No"), //alternate button title
+                                     NULL, //other button title, null--> no other button
+                                     &flgresult //response flags
+                                     );
+      if (flgresult == kCFUserNotificationDefaultResponse )
+        result = kYES;
+      else
+        result = kNO;
       break;
     case kMB_RETRYCANCEL:
-      [alert addButtonWithTitle:@"Retry"];
-      [alert addButtonWithTitle:@"Cancel"];
-      result = kCANCEL;
+      CFUserNotificationDisplayAlert(
+                                     0, // no timeout
+                                     icont, //change it depending message_type flags ( MB_ICONASTERISK.... etc.)
+                                     NULL, //icon url, use default, you can change it depending message_type flags
+                                     NULL, //not used
+                                     NULL, //localization of strings
+                                     header_ref, //header text
+                                     message_ref, //message text
+                                     CFSTR("Retry"), //default "ok" text in button
+                                     CFSTR("Cancel"), //alternate button title
+                                     NULL, //other button title, null--> no other button
+                                     &flgresult //response flags
+                                     );
+      if (flgresult == kCFUserNotificationDefaultResponse )
+        result = kRETRY;
+      else
+        result = kCANCEL;
       break;
     case kMB_YESNOCANCEL:
-      [alert addButtonWithTitle:@"Yes"];
-      [alert addButtonWithTitle:@"No"];
-      [alert addButtonWithTitle:@"Cancel"];
-      result = kCANCEL;
+      CFUserNotificationDisplayAlert(
+                                     0, // no timeout
+                                     icont, //change it depending message_type flags ( MB_ICONASTERISK.... etc.)
+                                     NULL, //icon url, use default, you can change it depending message_type flags
+                                     NULL, //not used
+                                     NULL, //localization of strings
+                                     header_ref, //header text
+                                     message_ref, //message text
+                                     CFSTR("Yes"), //default "ok" text in button
+                                     CFSTR("No"), //alternate button title
+                                     CFSTR("Cancel"), //other button title, null--> no other button
+                                     &flgresult //response flags
+                                     );
+      switch (flgresult)
+    {
+      case kCFUserNotificationDefaultResponse:
+        result = kYES;
+        break;
+      case kCFUserNotificationAlternateResponse:
+        result = kNO;
+        break;
+      default:
+        result = kCANCEL;
+        break;
+    }
       break;
   }
   
-  NSModalResponse response = [alert runModal];
+  //launch the message box
   
-  switch (type)
-  {
-    case kMB_OK:
-      result = kOK;
-      break;
-    case kMB_OKCANCEL:
-      result = (response == NSAlertFirstButtonReturn) ? kOK : kCANCEL;
-      break;
-    case kMB_YESNO:
-      result = (response == NSAlertFirstButtonReturn) ? kYES : kNO;
-      break;
-    case kMB_RETRYCANCEL:
-      result = (response == NSAlertFirstButtonReturn) ? kRETRY : kCANCEL;
-      break;
-    case kMB_YESNOCANCEL:
-      if (response == NSAlertFirstButtonReturn) result = kYES;
-      else if (response == NSAlertSecondButtonReturn) result = kNO;
-      else result = kCANCEL;
-      break;
-  }
   
-  if (completionHandler)
-  {
-    completionHandler(result);
-  }
+  //Clean up the strings
+  CFRelease( header_ref );
+  CFRelease( message_ref );
   
-  [alert release];
+  //Convert the result
   
-  return result;
+  
+  if(completionHandler)
+    completionHandler(static_cast<EMsgBoxResult>(result));
+  
+  return static_cast<EMsgBoxResult>(result);
 }
 
 void IGraphicsMac::ForceEndUserEdit()
@@ -691,6 +832,7 @@ bool IGraphicsMac::SetFilePathInClipboard(const char* path)
 
 bool IGraphicsMac::InitiateExternalFileDragDrop(const char* path, const IRECT& iconBounds)
 {
+#if __clang_major__ > 8
   NSPasteboardItem* pasteboardItem = [[NSPasteboardItem alloc] init];
   NSURL* fileURL = [NSURL fileURLWithPath: [NSString stringWithUTF8String: path]];
   [pasteboardItem setString:fileURL.absoluteString forType:NSPasteboardTypeFileURL];
@@ -709,10 +851,14 @@ bool IGraphicsMac::InitiateExternalFileDragDrop(const char* path, const IRECT& i
   ReleaseMouseCapture();
   
   return true;
+#else
+  return false;
+#endif
 }
 
 EUIAppearance IGraphicsMac::GetUIAppearance() const
 {
+#if __clang_major__ > 8
   if (@available(macOS 10.14, *)) {
     if(mView)
     {
@@ -721,7 +867,7 @@ EUIAppearance IGraphicsMac::GetUIAppearance() const
       return isDarkMode ? EUIAppearance::Dark :  EUIAppearance::Light;
     }
   }
-  
+#endif
   return EUIAppearance::Light;
 }
 

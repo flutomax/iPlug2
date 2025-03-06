@@ -19,6 +19,9 @@
 #include <cassert>
 
 #include "IPlugAPIBase.h"
+#if defined __APPLE__
+#include "IGraphics.h"
+#endif
 
 using namespace iplug;
 
@@ -186,6 +189,14 @@ void IPlugAPIBase::OnTimer(Timer& t)
       SysExData msg;
       mSysExDataFromProcessor.Pop(msg);
       SendSysexMsgFromDelegate({msg.mOffset, msg.mData, msg.mSize});
+    }
+#endif
+    
+    // chesk lost focus (added Vasan)
+#if defined __APPLE__
+    if (GetUI())
+    {
+      GetUI()->CheckFocus();
     }
 #endif
   }

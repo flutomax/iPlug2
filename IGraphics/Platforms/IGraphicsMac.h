@@ -36,6 +36,7 @@ public:
   void AttachPlatformView(const IRECT& r, void* pView) override;
   void RemovePlatformView(void* pView) override;
   void HidePlatformView(void* pView, bool hide) override;
+  void CheckFocus() override;
 
   void HideMouseCursor(bool hide, bool lock) override;
   void MoveMouseCursor(float x, float y) override;
@@ -45,7 +46,8 @@ public:
 
   void DoCursorLock(float x, float y, float& prevX, float& prevY);
     
-  EMsgBoxResult ShowMessageBox(const char* str, const char* title, EMsgBoxType type, IMsgBoxCompletionHandlerFunc completionHandler) override;
+  EMsgBoxResult ShowMessageBox(const char* str, const char* title, EMsgBoxType type, EMsgBoxIcon icon, IMsgBoxCompletionHandlerFunc completionHandler) override;
+
   void ForceEndUserEdit() override;
 
   const char* GetPlatformAPIStr() override;
@@ -92,6 +94,7 @@ private:
   
   void* mView = nullptr;
   CGPoint mCursorLockPosition;
+  bool fFocused = false;
   WDL_String mBundleID, mAppGroupID;
   friend int GetMouseOver(IGraphicsMac* pGraphics);
 };
