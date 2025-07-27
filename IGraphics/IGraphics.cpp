@@ -998,7 +998,7 @@ void IGraphics::OnMouseDown(const std::vector<IMouseInfo>& points)
       int nVals = pCapturedControl->NVals();
 #if defined AAX_API || !defined IGRAPHICS_NO_CONTEXT_MENU
       int valIdx = pCapturedControl->GetValIdxForPos(x, y);
-      int paramIdx = pCapturedControl->GetParamIdx((valIdx > kNoValIdx) ? valIdx : 0);
+      int paramIdx = pCapturedControl->GetParamIdxForHost((valIdx > kNoValIdx) ? valIdx : 0);
 #endif
         
 #ifdef AAX_API
@@ -1050,7 +1050,7 @@ void IGraphics::OnMouseDown(const std::vector<IMouseInfo>& points)
 
       for (int v = 0; v < nVals; v++)
       {
-        if (pCapturedControl->GetParamIdx(v) > kNoParameter)
+        if (pCapturedControl->GetParamIdxForHost(v) > kNoParameter)
           GetDelegate()->BeginInformHostOfParamChangeFromUI(pCapturedControl->GetParamIdx(v));
       }
 
@@ -1082,7 +1082,7 @@ void IGraphics::OnMouseUp(const std::vector<IMouseInfo>& points)
 
         for (int v = 0; v < nVals; v++)
         {
-          if (pCapturedControl->GetParamIdx(v) > kNoParameter)
+          if (pCapturedControl->GetParamIdxForHost(v) > kNoParameter)
             GetDelegate()->EndInformHostOfParamChangeFromUI(pCapturedControl->GetParamIdx(v));
         }
         
@@ -1942,8 +1942,12 @@ void IGraphics::CreateTextEntry(IControl& control, const IText& text, const IREC
 {
   mInTextEntry = &control;
   mTextEntryValIdx = valIdx;
-    
+  
   int paramIdx = valIdx > kNoValIdx  ? control.GetParamIdx(valIdx) : kNoParameter;
+
+  // vasan: for fake parametr use negative valIdx 
+  if (valIdx < kNoValIdx)
+    paramIdx = valIdx;
 
   if (mTextEntryControl)
     mTextEntryControl->CreateTextEntry(paramIdx, text, bounds, control.GetTextEntryLength(), str);

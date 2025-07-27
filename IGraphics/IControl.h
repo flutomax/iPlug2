@@ -218,6 +218,14 @@ public:
   /** @return Currently set tooltip text */
   inline const char* GetTooltip() const { return mTooltip.Get(); }
 
+  /**
+   * Vasan: this method can disabled call BeginInformHostOfParamChangeFromUI and EndInformHostOfParamChangeFromUI
+   * @param valIdx An index to choose which of the control's linked parameters to retrieve. NOTE: since controls usually have only 1 parameter you can omit this argument and use the default index of 0
+   * @return Parameter index, or kNoParameter if you want to prohibit calling methods BeginInformHostOfParamChangeFromUI and EndInformHostOfParamChangeFromUI
+   */
+
+  virtual int GetParamIdxForHost(int valIdx = 0) const { return GetParamIdx(valIdx); }
+
   /** Get the index of a parameter that the control is linked to
    * Normaly controls are either linked to a single parameter or no parameter but some may be linked to multiple parameters
    * @param valIdx An index to choose which of the control's linked parameters to retrieve. NOTE: since controls usually have only 1 parameter you can omit this argument and use the default index of 0

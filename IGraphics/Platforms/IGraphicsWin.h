@@ -16,6 +16,11 @@
 
 #include "IGraphics_select.h"
 
+// Custom cursors definition
+
+#define CURSOR_HANDCLOSED 1000
+#define CURSOR_HANDOPEN 1001
+
 BEGIN_IPLUG_NAMESPACE
 BEGIN_IGRAPHICS_NAMESPACE
 
@@ -160,6 +165,8 @@ private:
   const IParam* mEditParam = nullptr;
   IText mEditText;
   IRECT mEditRECT;
+  // vasan: for handle fake parametrs
+  int mEditFakeParam = 0;
 
   EParamEditMsg mParamEditMsg = kNone;
   bool mShowingTooltip = false;

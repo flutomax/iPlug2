@@ -33,6 +33,8 @@
 #ifndef _WDL_HEAPBUF_H_
 #define _WDL_HEAPBUF_H_
 
+#include <stdlib.h>
+
 #ifndef WDL_HEAPBUF_IMPL_ONLY
 
 #ifdef WDL_HEAPBUF_TRACE

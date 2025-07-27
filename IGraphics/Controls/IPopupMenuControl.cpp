@@ -148,13 +148,17 @@ void IPopupMenuControl::Draw(IGraphics& g)
           //TODO: Title indent?
           DrawCellText(g, *pCellRect, pMenuItem, sel, &pMenuPanel->mBlend);
           
-          if(pMenuItem->GetChecked())
+          if (pMenuItem->GetChecked())
+            DrawCheck(g, *pCellRect, pMenuItem, sel, &pMenuPanel->mBlend);
+
+          if (pMenuItem->GetRadio())
             DrawTick(g, *pCellRect, pMenuItem, sel, &pMenuPanel->mBlend);
           
           if(pMenuItem->GetSubmenu())
             DrawSubMenuArrow(g, *pCellRect, pMenuItem, sel, &pMenuPanel->mBlend);
         }
       }
+      DrawPanelFrame(g, pMenuPanel);
     }
   }
   
@@ -334,6 +338,12 @@ void IPopupMenuControl::DrawPanelBackground(IGraphics& g, MenuPanel* panel)
   g.FillRoundRect(mPanelBackgroundColor, panel->mTargetRECT, mRoundness, &panel->mBlend);
 }
 
+void IPopupMenuControl::DrawPanelFrame(IGraphics& g, MenuPanel* panel)
+{
+  if (mThickness > 0.f)
+    g.DrawRoundRect(mFrameColor, panel->mTargetRECT, mRoundness, &panel->mBlend, mThickness);
+}
+
 void IPopupMenuControl::DrawPanelShadow(IGraphics& g, MenuPanel* panel)
 {
   IRECT inner = panel->mRECT.GetPadded(-mDropShadowSize);
@@ -342,7 +352,11 @@ void IPopupMenuControl::DrawPanelShadow(IGraphics& g, MenuPanel* panel)
 
 void IPopupMenuControl::DrawCellBackground(IGraphics& g, const IRECT& bounds, const IPopupMenu::Item* pItem, bool sel, IBlend* pBlend)
 {
-  if(sel)
+  // check pItem first
+  if (pItem && pItem->GetIsTitle())
+    return;
+  
+  if (sel)
     g.FillRect(mCellBackGroundColor, bounds.GetHPadded(PAD), pBlend);
 }
 
@@ -361,8 +375,53 @@ void IPopupMenuControl::DrawCellText(IGraphics& g, const IRECT& bounds, const IP
       mText.mFGColor = mDisabledItemColor;
   }
   
-  mText.mAlign = EAlign::Near;
-  g.DrawText(mText, pItem->GetText(), textRect, pBlend);
+  if (pItem->GetIsTitle())
+  {
+    IRECT r, rs;
+    mText.mAlign = EAlign::Center;
+    g.MeasureText(mText, pItem->GetText(), r);
+    r.Translate(bounds.MW(), bounds.MH());
+    rs.T = r.MH() - 0.5f;
+    rs.B = rs.T + 1.f;
+    rs.L = bounds.L + 0.5f;
+    rs.R = r.L - 2.5f;
+    g.FillRect(COLOR_DARK_GRAY, rs, pBlend);
+    rs.L = r.R + 2.5f;
+    rs.R = bounds.R - 0.5f;
+    g.FillRect(COLOR_DARK_GRAY, rs, pBlend);    
+    g.DrawText(mText, pItem->GetText(), bounds, pBlend);
+  }
+  else
+  {
+    mText.mAlign = EAlign::Near;
+    const char* tab = strchr(pItem->GetText(), '\t');
+    if (tab)
+    {
+      char* cap = new char[strlen(pItem->GetText()) + 1]{ 0 };
+      char* key = new char[strlen(tab) + 1]{ 0 };
+      strcpy(key, tab + 1);
+      strncpy(cap, pItem->GetText(), tab - pItem->GetText());
+      g.DrawText(mText.WithAlign(EAlign::Far), key, textRect, pBlend);
+      g.DrawText(mText, cap, textRect, pBlend);
+      delete[] key;
+      delete[] cap;
+    }
+    else
+    {      
+      g.DrawText(mText, pItem->GetText(), textRect, pBlend);
+    }
+  }
+}
+
+void IPopupMenuControl::DrawCheck(IGraphics& g, const IRECT& bounds, const IPopupMenu::Item* pItem, bool sel, IBlend* pBlend)
+{
+  IRECT tickRect = IRECT(bounds.L, bounds.T, bounds.L + TICK_SIZE, bounds.B).GetCentredInside(TICK_SIZE * 0.75f);
+  const IColor c = pItem->GetEnabled() ? sel ? mItemMouseoverColor : mItemColor : COLOR_GRAY;
+  const float xc = tickRect.L + tickRect.W() * 0.4f;
+  const float yc = tickRect.T + tickRect.H() * 0.85f;
+  const float yt = tickRect.T + tickRect.H() * 0.15f;
+  g.DrawLine(c, tickRect.L, tickRect.MH(), xc, yc, pBlend, 2.0f);
+  g.DrawLine(c, xc, yc, tickRect.R, yt, pBlend, 2.0f);
 }
 
 void IPopupMenuControl::DrawTick(IGraphics& g, const IRECT& bounds, const IPopupMenu::Item* pItem, bool sel, IBlend* pBlend)
@@ -472,8 +531,9 @@ IRECT IPopupMenuControl::GetLargestCellRectForMenu(IPopupMenu& menu, float x, fl
     span = span.Union(textBounds);
   }
   
-  span.HPad(TEXT_HPAD); // add some padding because we don't want to be flush to the edges
-  span.Pad(TICK_SIZE, 0, ARROW_SIZE, 0);
+  span.HPad(TEXT_HPAD + 10.f); // add some padding because we don't want to be flush to the edges
+  // vasan + 10 px 
+  span.Pad(TICK_SIZE, 2, ARROW_SIZE, 1);
   
   return IRECT(x, y, x + span.W(), y + span.H());
 }

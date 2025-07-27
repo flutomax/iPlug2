@@ -913,9 +913,30 @@ static CVReturn displayLinkCallback(CVDisplayLinkRef displayLink, const CVTimeSt
 {
   if (mTextFieldView) [self endUserInput ];
   IMouseInfo info = [self getMouseLeft:pEvent];
-  float d = [pEvent deltaY];
+#if defined GESTURE_CONTROLS
+  if (pEvent.phase == NSEventPhaseNone && pEvent.momentumPhase == NSEventPhaseNone)
+  {
+    float d = [pEvent scrollingDeltaY];
+    if (mGraphics)
+      mGraphics->OnMouseWheel(info.x, info.y, info.ms, d);
+  }
+  else
+  {
+    IGestureInfo gi;
+    gi.x = info.x;
+    gi.y = info.y;
+    gi.scale = [pEvent scrollingDeltaX];
+    gi.velocity = [pEvent scrollingDeltaY];
+    gi.state = EGestureState::InProcess;
+    gi.type = EGestureType::Pan;
+    if (mGraphics)
+      mGraphics->OnGestureRecognized(gi);
+  }
+#else
+  float d = [pEvent scrollingDeltaY];
   if (mGraphics)
     mGraphics->OnMouseWheel(info.x, info.y, info.ms, d);
+#endif
 }
 
 static void MakeCursorFromName(NSCursor*& cursor, const char *name)
@@ -1029,6 +1050,8 @@ static void MakeCursorFromName(NSCursor*& cursor, const char *name)
     }
     case ECursor::INO: pCursor = [NSCursor operationNotAllowedCursor]; break;
     case ECursor::HAND: pCursor = [NSCursor pointingHandCursor]; break;
+		case ECursor::HANDCLOSED: pCursor = [NSCursor closedHandCursor]; break;
+    case ECursor::HANDOPEN: pCursor = [NSCursor openHandCursor]; break;
     case ECursor::APPSTARTING:
       if ([NSCursor respondsToSelector:@selector(busyButClickableCursor)])
         pCursor = [NSCursor performSelector:@selector(busyButClickableCursor)];
@@ -1038,6 +1061,7 @@ static void MakeCursorFromName(NSCursor*& cursor, const char *name)
         pCursor = [NSCursor performSelector:@selector(_helpCursor)];
       helpRequested = true;
       break;
+    case ECursor::DRAGNDROP: pCursor = [NSCursor dragCopyCursor]; break;
     default: pCursor = [NSCursor arrowCursor]; break;
   }
 

@@ -4,12 +4,8 @@
 #include "IGraphics.h"
 
 // N.B. - this must be defined according to the skia build, not the iPlug build
-#if (defined OS_MAC || defined OS_IOS) && !defined IGRAPHICS_SKIA_NO_METAL
+#if defined OS_MAC || defined OS_IOS
 #define SK_METAL
-#endif
-
-#if defined IGRAPHICS_GL
-#define SK_GL
 #endif
 
 #pragma warning( push )
@@ -18,7 +14,6 @@
 #include "SkPath.h"
 #include "SkCanvas.h"
 #include "SkImage.h"
-#include "GrDirectContext.h"
 #pragma warning( pop )
 
 BEGIN_IPLUG_NAMESPACE
@@ -132,7 +127,8 @@ protected:
 
   APIBitmap* LoadAPIBitmap(const char* fileNameOrResID, int scale, EResourceLocation location, const char* ext) override;
   APIBitmap* LoadAPIBitmap(const char* name, const void* pData, int dataSize, int scale) override;
-private:  
+private:
+    
   void PrepareAndMeasureText(const IText& text, const char* str, IRECT& r, double& x, double & y, SkFont& font) const;
 
   void PathTransformSetMatrix(const IMatrix& m) override;
@@ -144,15 +140,13 @@ private:
   SkCanvas* mCanvas = nullptr;
   SkPath mMainPath;
   SkMatrix mMatrix;
-  SkMatrix mClipMatrix;
-  SkMatrix mFinalMatrix;
 
 #if defined OS_WIN && defined IGRAPHICS_CPU
   WDL_TypedBuf<uint8_t> mSurfaceMemory;
 #endif
   
 #ifndef IGRAPHICS_CPU
-  sk_sp<GrDirectContext> mGrContext;
+  sk_sp<GrContext> mGrContext;
   sk_sp<SkSurface> mScreenSurface;
 #endif
   
@@ -162,7 +156,7 @@ private:
   void* mMTLDrawable;
   void* mMTLLayer;
 #endif
-
+  
   static StaticStorage<Font> sFontCache;
 };
 

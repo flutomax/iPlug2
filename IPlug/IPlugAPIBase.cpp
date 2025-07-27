@@ -120,7 +120,9 @@ void IPlugAPIBase::SetParameterValue(int idx, double normalizedValue)
 {
   Trace(TRACELOC, "%d:%f", idx, normalizedValue);
   GetParam(idx)->SetNormalized(normalizedValue);
-  InformHostOfParamChange(idx, normalizedValue);
+  // Vasan: ignore Hidden Parametr
+  if (!GetParam(idx)->GetHidden())
+    InformHostOfParamChange(idx, normalizedValue);
   OnParamChange(idx, kUI);
 }
 
@@ -135,6 +137,10 @@ void IPlugAPIBase::DirtyParametersFromUI()
 
 void IPlugAPIBase::SendParameterValueFromAPI(int paramIdx, double value, bool normalized)
 {
+  // mParamChangeFromProcessor not used in VST3 (added Vasan)
+#if defined VST3P_API || defined VST3_API
+  return;
+#endif
   if (normalized)
     value = GetParam(paramIdx)->FromNormalized(value);
   
@@ -191,7 +197,6 @@ void IPlugAPIBase::OnTimer(Timer& t)
       SendSysexMsgFromDelegate({msg.mOffset, msg.mData, msg.mSize});
     }
 #endif
-    
     // chesk lost focus (added Vasan)
 #if defined __APPLE__
     if (GetUI())
@@ -199,6 +204,7 @@ void IPlugAPIBase::OnTimer(Timer& t)
       GetUI()->CheckFocus();
     }
 #endif
+   
   }
   
   OnIdle();

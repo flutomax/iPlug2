@@ -81,12 +81,16 @@ public:
   virtual void DrawSubMenuCalloutArrow(IGraphics& g, const IRECT& bounds, IBlend* pBlend);
   /** Override this method to change the background of the pop-up menu panel */
   virtual void DrawPanelBackground(IGraphics& g, MenuPanel* panel);
+  /** Override this method to change the frame of the pop-up menu panel */
+  virtual void DrawPanelFrame(IGraphics& g, MenuPanel* panel);
   /** Override this method to change the shadow of the pop-up menu panel */
   virtual void DrawPanelShadow(IGraphics& g, MenuPanel* panel);
   /** Override this method to change the way a cell's background is drawn */
   virtual void DrawCellBackground(IGraphics& g, const IRECT& bounds, const IPopupMenu::Item* pItem, bool sel, IBlend* pBlend);
   /** Override this method to change the way a cell's text is drawn */
   virtual void DrawCellText(IGraphics& g, const IRECT& bounds, const IPopupMenu::Item* pItem, bool sel, IBlend* pBlend);
+  /** Vasan: draw checkbox */
+  virtual void DrawCheck(IGraphics& g, const IRECT& bounds, const IPopupMenu::Item* pItem, bool sel, IBlend* pBlend);
   /** Override this method to change the way a checked cell's "tick" is drawn */
   virtual void DrawTick(IGraphics& g, const IRECT& bounds, const IPopupMenu::Item* pItem, bool sel, IBlend* pBlend);
   /** Override this method to change the way a submenu cell's arrow is drawn */
@@ -110,6 +114,9 @@ public:
   void SetDisabledItemColor(IColor color) { mDisabledItemColor = color; }
   /** Call this to set the Separator color on menu panels */
   void SetSeparatorColor(IColor color) { mSeparatorColor = color; }
+  /** Call this to set the frame color and thickness */
+  void SetFrameColorAndThickness(IColor color, float thickness = 0) { mFrameColor = color; mThickness = thickness; }
+  
   /** Sets the amount the main menu is shifted to make room for submenus. This helps on small GUI's where submenus will intrude upon the main menu.
    * This does not affect the positioning of menus that do not contain submenus.
    * @param distance The distance in pixels to shift the main menu. Use only positive numbers. It will shift left if the center of the control that
@@ -244,6 +251,9 @@ private:
   IColor mItemColor = COLOR_BLACK;
   IColor mDisabledItemColor = COLOR_GRAY;
   IColor mSeparatorColor = COLOR_MID_GRAY;
+  IColor mFrameColor = COLOR_BLACK;
+  
+  float mThickness = 0.f;
 
 protected:
   IRECT mSpecifiedCollapsedBounds;

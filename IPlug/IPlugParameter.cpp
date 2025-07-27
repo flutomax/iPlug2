@@ -194,6 +194,8 @@ void IParam::InitPitch(const char *name, int defaultVal, int minVal, int maxVal,
     MidiNoteName(i, displayText, /*cents*/false, middleCisC);
     SetDisplayText(i - minVal, displayText.Get());
   }
+  // Vasan - adding units
+  mUnit = kUnitMIDINote;
 }
 
 void IParam::InitGain(const char *name, double defaultVal, double minVal, double maxVal, double step, int flags, const char *group)
@@ -382,12 +384,27 @@ const char* IParam::GetDisplayTextAtIdx(int idx, double* pValue) const
 bool IParam::MapDisplayText(const char* str, double* pValue) const
 {
   int n = mDisplayTexts.GetSize();
-  for (DisplayText* pDT = mDisplayTexts.Get(); n; --n, ++pDT)
+  // Vasan - handle ignore case for midi notes
+  if (mUnit == kUnitMIDINote)
   {
-    if (!strcmp(str, pDT->mText))
+    for (DisplayText* pDT = mDisplayTexts.Get(); n; --n, ++pDT)
     {
-      *pValue = pDT->mValue;
-      return true;
+      if (!stricmp(str, pDT->mText))
+      {
+        *pValue = pDT->mValue;
+        return true;
+      }
+    }
+  }
+  else
+  {
+    for (DisplayText* pDT = mDisplayTexts.Get(); n; --n, ++pDT)
+    {
+      if (!strcmp(str, pDT->mText))
+      {
+        *pValue = pDT->mValue;
+        return true;
+      }
     }
   }
   return false;

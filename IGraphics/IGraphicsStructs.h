@@ -1263,6 +1263,32 @@ struct IRECT
     return r;
   }
   
+  /** makes sure TopLeft is above and to the left of BottomRight
+   */
+  inline void Normalize()
+  {
+    float temp;
+    if (T > B)
+    {
+      temp = T;
+      T = B;
+      B = temp;
+    }
+    if (L > R)
+    {
+      temp = L;
+      L = R;
+      R = temp;
+    }
+  }
+  
+  IRECT GetNormalized() const
+  {
+    IRECT r = *this;
+    r.Normalize();
+    return r;
+  }
+  
   /** Pad this IRECT
    * N.B. Using a positive padding value will expand the IRECT, a negative value will contract it
    * @param padding Padding amount */

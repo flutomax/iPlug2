@@ -50,7 +50,8 @@ public:
       kDisabled = 1 << 0,     // item is gray and not selectable
       kTitle    = 1 << 1,     // item indicates a title and is not selectable
       kChecked  = 1 << 2,     // item has a checkmark
-      kSeparator  = 1 << 3    // item is a separator
+      kSeparator  = 1 << 3,   // item is a separator
+      kRadio = 1 << 4			    // Vasan: item has radiobutton 
     };
     
     Item(const char* str, int flags = kNoFlags, int tag = -1)
@@ -79,6 +80,7 @@ public:
     
     bool GetEnabled() const { return !(mFlags & kDisabled); }
     bool GetChecked() const { return (mFlags & kChecked) != 0; }
+    bool GetRadio() const { return (mFlags & kRadio) != 0; }
     bool GetIsTitle() const { return (mFlags & kTitle) != 0; }
     bool GetIsSeparator() const { return (mFlags & kSeparator) != 0; }
     int GetTag() const { return mTag; }

@@ -150,10 +150,9 @@ public:
   Steinberg::tresult PLUGIN_API onKeyDown (Steinberg::char16 key, Steinberg::int16 keyMsg, Steinberg::int16 modifiers) override
   {
     // Workaround for Reaper's funky key/keyMsg
-    if (mOwner.GetHost() == iplug::EHost::kHostReaper)
+    if (mOwner.GetHost() == iplug::EHost::kHostReaper &&
+        keyMsg == Steinberg::VirtualKeyCodes::KEY_SPACE)
     {
-      if (keyMsg == Steinberg::VirtualKeyCodes::KEY_SPACE)
-      {
         iplug::IKeyPress keyPress { " ", 
           iplug::kVK_SPACE,
           static_cast<bool>(modifiers & Steinberg::kShiftKey),
@@ -161,11 +160,6 @@ public:
           static_cast<bool>(modifiers & Steinberg::kAlternateKey)};
         
         return mOwner.OnKeyDown(keyPress) ? Steinberg::kResultTrue : Steinberg::kResultFalse;
-      }
-      else
-      {
-        return Steinberg::kResultFalse;
-      }
     }
     else
     {

@@ -184,8 +184,11 @@ enum class ECursor
   SIZEALL,
   INO,
   HAND,
+	HANDCLOSED,
+  HANDOPEN,
   APPSTARTING,
-  HELP
+  HELP,
+  DRAGNDROP
 };
 
 /** \todo */

@@ -55,6 +55,7 @@ using namespace igraphics;
 #define STB_TEXTEDIT_K_INSERT (VIRTUAL_KEY_BIT | kVK_INSERT)
 #define STB_TEXTEDIT_K_PGUP (VIRTUAL_KEY_BIT | kVK_PRIOR)
 #define STB_TEXTEDIT_K_PGDOWN (VIRTUAL_KEY_BIT | kVK_NEXT)
+#define STB_TEXTEDIT_K_MINUS ('-')
 // functions
 #define STB_TEXTEDIT_STRINGLEN(tc) ITextEntryControl::GetLength (tc)
 #define STB_TEXTEDIT_LAYOUTROW ITextEntryControl::Layout
@@ -213,6 +214,25 @@ void ITextEntryControl::OnMouseUp(float x, float y, const IMouseMod& mod)
   }
 }
 
+void ITextEntryControl::OnMouseOver(float x, float y, const IMouseMod& mod)
+{
+  if (mBeamCursor)
+  {
+    if (mRECT.Contains(x, y))
+      GetUI()->SetMouseCursor(ECursor::IBEAM);
+    else
+      GetUI()->SetMouseCursor(ECursor::ARROW);
+  }
+  IControl::OnMouseOver(x, y, mod);
+}
+
+void ITextEntryControl::OnMouseOut()
+{
+  if (mBeamCursor)
+    GetUI()->SetMouseCursor(ECursor::ARROW);
+  IControl::OnMouseOut();
+}
+
 bool ITextEntryControl::OnKeyDown(float x, float y, const IKeyPress& key)
 {
   if (key.C)
@@ -271,6 +291,7 @@ bool ITextEntryControl::OnKeyDown(float x, float y, const IKeyPress& key)
     case kVK_NEXT: stbKey = STB_TEXTEDIT_K_PGDOWN; break;
     case kVK_HOME: stbKey = STB_TEXTEDIT_K_LINESTART; break;
     case kVK_END: stbKey = STB_TEXTEDIT_K_LINEEND; break;
+    case kVK_INSERT: stbKey = STB_TEXTEDIT_K_MINUS; break;
     case kVK_RETURN: CommitEdit(); break;
     case kVK_ESCAPE: DismissEdit(); break;
     default:
@@ -288,6 +309,8 @@ bool ITextEntryControl::OnKeyDown(float x, float y, const IKeyPress& key)
         switch (pParam->Type())
         {
           case IParam::kTypeEnum:
+            // Vasan - in enum parametr type may be any characters!
+            break; 
           case IParam::kTypeInt:
           case IParam::kTypeBool:
           {
@@ -532,10 +555,16 @@ float ITextEntryControl::MeasureCharWidth(char16_t c, char16_t nc)
   return GetUI()->MeasureText(mText, str.c_str(), bounds);
 }
 
+void ITextEntryControl::SetBeamCursor(bool beamcursor)
+{
+  mBeamCursor = beamcursor;
+}
+
 void ITextEntryControl::CreateTextEntry(int paramIdx, const IText& text, const IRECT& bounds, int length, const char* str)
 {
   fParamIndex = paramIdx;
   SetTargetAndDrawRECTs(bounds);
+  mMouseIsOver = mBeamCursor;
   SetText(text);
   mText.mFGColor = mText.mTextEntryFGColor;
   SetStr(str);
@@ -549,6 +578,8 @@ void ITextEntryControl::CreateTextEntry(int paramIdx, const IText& text, const I
 void ITextEntryControl::DismissEdit()
 {
   mEditing = false;
+  if (mBeamCursor)
+    GetUI()->SetMouseCursor();
   SetTargetAndDrawRECTs(IRECT());
   GetUI()->ClearInTextEntryControl();
   GetUI()->SetAllControlsDirty();
@@ -557,6 +588,8 @@ void ITextEntryControl::DismissEdit()
 void ITextEntryControl::CommitEdit()
 {
   mEditing = false;
+  if (mBeamCursor)
+    GetUI()->SetMouseCursor();
   GetUI()->SetControlValueAfterTextEdit(StringConvert{}.to_bytes(mEditString).c_str());
   SetTargetAndDrawRECTs(IRECT());
   GetUI()->SetAllControlsDirty();

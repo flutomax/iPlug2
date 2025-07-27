@@ -297,6 +297,13 @@ static void GetHostNameStr(EHost host, WDL_String& str)
  * @param middleCisC4 \todo */
 static void MidiNoteName(double midiPitch, WDL_String& noteName, bool cents = false, bool middleCisC4 = false)
 {
+  // Vasan - negatie values is 0
+  if (midiPitch < 0.0)
+  {
+    noteName.Set("0");
+    return;
+  }
+
   static const char noteNames[12][3] = {"C ","C#","D ","D#","E ","F ","F#","G ","G#","A ","A#","B "};
   
   int midiPitchR = (int) std::round(midiPitch);

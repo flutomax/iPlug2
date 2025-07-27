@@ -228,7 +228,11 @@ bool IPlugVST3::EditorResize(int viewWidth, int viewHeight)
 void IPlugVST3::DirtyParametersFromUI()
 {
   for (int i = 0; i < NParams(); i++)
+  {
+    if (GetParam(i)->GetHidden())
+      continue;
     IPlugVST3ControllerBase::SetVST3ParamNormalized(i, GetParam(i)->GetNormalized());
+  }
   
   startGroupEdit();
   IPlugAPIBase::DirtyParametersFromUI();
@@ -237,7 +241,9 @@ void IPlugVST3::DirtyParametersFromUI()
 
 void IPlugVST3::SendParameterValueFromUI(int paramIdx, double normalisedValue)
 {
-  IPlugVST3ControllerBase::SetVST3ParamNormalized(paramIdx, normalisedValue);
+  // Vasan: ignore Hidden Parametr
+  if (!GetParam(paramIdx)->GetHidden())
+    IPlugVST3ControllerBase::SetVST3ParamNormalized(paramIdx, normalisedValue);
   IPlugAPIBase::SendParameterValueFromUI(paramIdx, normalisedValue);
 }
 

@@ -36,7 +36,7 @@ using namespace igraphics;
 #pragma warning(disable:4311) // Pointer size cast mismatch.
 
 static int nWndClassReg = 0;
-static wchar_t* wndClassName = L"IPlugWndClass";
+static const wchar_t* wndClassName = L"IPlugWndClass";
 static double sFPS = 0.0;
 
 #define PARAM_EDIT_ID 99
@@ -756,6 +756,39 @@ LRESULT CALLBACK IGraphicsWin::ParamEditProc(HWND hWnd, UINT msg, WPARAM wParam,
     {
       case WM_CHAR:
       {
+        // vasan: handle for fake parametr
+        if (pGraphics->mEditFakeParam < -1)
+        {
+          char c = wParam;
+
+          if (c == 0x08) break; // backspace
+
+          switch (pGraphics->mEditFakeParam)
+          {
+          case -2: // int
+            if (c >= '0' && c <= '9') break;
+            else if (c == '-') break;
+            else if (c == '+') break;
+            else return 0;
+          case -3: // double
+            if (c >= '0' && c <= '9') break;
+            else if (c == '-') break;
+            else if (c == '+') break;
+            else if (c == '.') break;
+            else if (c == ',') break;
+            else return 0;
+          case -4: // note
+            if (c >= 'A' && c <= 'G') break;
+            else if (c >= 'a' && c <= 'g') break;
+            else if (c >= '0' && c <= '9') break;
+            else if (c == '-') break;
+            else if (c == '#') break;
+            else return 0;
+          default:
+            break;
+          }
+        }
+        else
         // limit to numbers for text entry on appropriate parameters
         if (pGraphics->mEditParam)
         {
@@ -1014,8 +1047,17 @@ ECursor IGraphicsWin::SetMouseCursor(ECursor cursorType)
     case ECursor::SIZEALL:          cursor = LoadCursor(NULL, IDC_SIZEALL);         break;
     case ECursor::INO:              cursor = LoadCursor(NULL, IDC_NO);              break;
     case ECursor::HAND:             cursor = LoadCursor(NULL, IDC_HAND);            break;
+    case ECursor::HANDCLOSED:       cursor = LoadCursor(mHInstance, MAKEINTRESOURCE(CURSOR_HANDCLOSED)); break;
+    case ECursor::HANDOPEN:         cursor = LoadCursor(mHInstance, MAKEINTRESOURCE(CURSOR_HANDOPEN)); break;
     case ECursor::APPSTARTING:      cursor = LoadCursor(NULL, IDC_APPSTARTING);     break;
     case ECursor::HELP:             cursor = LoadCursor(NULL, IDC_HELP);            break;
+		case ECursor::DRAGNDROP:
+    {
+      HMODULE oleMod = LoadLibraryEx(TEXT("ole32.dll"), NULL, LOAD_LIBRARY_AS_DATAFILE);
+      cursor = LoadCursor(oleMod, MAKEINTRESOURCE(3));
+      FreeLibrary(oleMod);
+    }
+    break;
     default:
       cursor = LoadCursor(NULL, IDC_ARROW);
   }
@@ -1554,6 +1596,7 @@ void IGraphicsWin::CreatePlatformTextEntry(int paramIdx, const IText& text, cons
   mEditParam = paramIdx > kNoParameter ? GetDelegate()->GetParam(paramIdx) : nullptr;
   mEditText = text;
   mEditRECT = bounds;
+  mEditFakeParam = paramIdx < kNoParameter ? paramIdx : 0;
 
   SendMessageW(mParamEditWnd, EM_LIMITTEXT, (WPARAM) length, 0);
   SendMessageW(mParamEditWnd, WM_SETFONT, (WPARAM) mEditFont, 0);
@@ -1837,11 +1880,15 @@ void IGraphicsWin::ShowTooltip()
 {
   if (mTooltipIdx > -1)
   {
-    const char* tooltip = GetControl(mTooltipIdx)->GetTooltip();
-    if (tooltip)
+    const IControl* ctrl = GetControl(mTooltipIdx);
+    if (ctrl)
     {
-      SetTooltip(tooltip);
-      mShowingTooltip = true;
+      const char* tooltip = ctrl->GetTooltip();
+      if (tooltip)
+      {
+        SetTooltip(tooltip);
+        mShowingTooltip = true;
+      }
     }
   }
 }

@@ -47,6 +47,8 @@ public:
   void OnMouseDrag(float x, float y, float dX, float dY, const IMouseMod& mod) override;
   void OnMouseUp(float x, float y, const IMouseMod& mod) override;
   void OnMouseDblClick(float x, float y, const IMouseMod& mod) override;
+  void OnMouseOver(float x, float y, const IMouseMod& mod) override;
+  void OnMouseOut() override;
   void OnEndAnimation() override;
   
   static int DeleteChars(ITextEntryControl* _this, size_t pos, size_t num);
@@ -62,6 +64,8 @@ public:
   void CommitEdit();
 
   void CreateTextEntry(int paramIdx, const IText& text, const IRECT& bounds, int length, const char* str);
+  
+  void SetBeamCursor(bool beamcursor);
 
 private:
   template<typename Proc>
@@ -78,6 +82,7 @@ protected:
   void SelectAll();
   
   bool mDrawCursor = false;
+  bool mBeamCursor = false;
   bool mEditing = false;
   bool mRecursiveKeyGuard = false;
   bool mCursorIsSet = false;
