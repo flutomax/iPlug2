@@ -213,7 +213,7 @@ public:
    * @param a2 the end angle of the arc at in degrees clockwise where 0 is up
    * @param pBlend Optional blend method
    * @param thickness Optional line thickness */
-  virtual void DrawArc(const IColor& color, float cx, float cy, float r, float a1, float a2, const IBlend* pBlend = 0, float thickness = 1.f);
+  virtual void DrawArc(const IColor& color, float cx, float cy, float r, float fA, float a2, const IBlend* pBlend = 0, float thickness = 1.f);
 
   /** Draw a circle to the graphics context
    * @param color The color to draw the shape with
@@ -324,7 +324,7 @@ public:
    * @param a1 the start angle  of the arc at in degrees clockwise where 0 is up
    * @param a2 the end angle  of the arc at in degrees clockwise where 0 is up
    * @param pBlend Optional blend method */
-  virtual void FillArc(const IColor& color, float cx, float cy, float r, float a1, float a2, const IBlend* pBlend = 0);
+  virtual void FillArc(const IColor& color, float cx, float cy, float r, float fA, float a2, const IBlend* pBlend = 0);
 
   /** Fill a convex polygon with a color
    * @param color The color to fill the shape with
@@ -644,7 +644,7 @@ public:
    * @param r The radius of the circle on which the arc lies
    * @param a1 the start angle of the arc at in degrees clockwise where 0 is up
    * @param a2 the end angle of the arc at in degrees clockwise where 0 is up */
-  virtual void PathArc(float cx, float cy, float r, float a1, float a2, EWinding winding = EWinding::CW) = 0;
+  virtual void PathArc(float cx, float cy, float r, float fA, float a2, EWinding winding = EWinding::CW) = 0;
 
   /** Add a circle to the current path
    * @param cx The X coordinate of the centre of the circle

@@ -579,10 +579,10 @@ void IVMenuButtonControl::SetValueFromUserInput(double value, int valIdx)
   }
 }
 
-IVKnobControl::IVKnobControl(const IRECT& bounds, int paramIdx, const char* label, const IVStyle& style, bool valueIsEditable, bool valueInWidget, float a1, float a2, float aAnchor,  EDirection direction, double gearing, float trackSize)
+IVKnobControl::IVKnobControl(const IRECT& bounds, int paramIdx, const char* label, const IVStyle& style, bool valueIsEditable, bool valueInWidget, float fA, float a2, float aAnchor,  EDirection direction, double gearing, float trackSize)
 : IKnobControlBase(bounds, paramIdx, direction, gearing)
 , IVectorBase(style, false, valueInWidget)
-, mAngle1(a1)
+, mAngle1(fA)
 , mAngle2(a2)
 , mAnchorAngle(aAnchor)
 {
@@ -594,10 +594,10 @@ IVKnobControl::IVKnobControl(const IRECT& bounds, int paramIdx, const char* labe
   AttachIControl(this, label);
 }
 
-IVKnobControl::IVKnobControl(const IRECT& bounds, IActionFunction aF, const char* label, const IVStyle& style, bool valueIsEditable, bool valueInWidget,  float a1, float a2, float aAnchor, EDirection direction, double gearing, float trackSize)
+IVKnobControl::IVKnobControl(const IRECT& bounds, IActionFunction aF, const char* label, const IVStyle& style, bool valueIsEditable, bool valueInWidget,  float fA, float a2, float aAnchor, EDirection direction, double gearing, float trackSize)
 : IKnobControlBase(bounds, kNoParameter, direction, gearing)
 , IVectorBase(style, false, valueInWidget)
-, mAngle1(a1)
+, mAngle1(fA)
 , mAngle2(a2)
 , mAnchorAngle(aAnchor)
 {

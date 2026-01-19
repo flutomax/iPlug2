@@ -144,7 +144,7 @@ struct IMidiMsg
    * @param channel MIDI channel [0, 15] */
   void MakeNoteOnMsg(int noteNumber, int velocity, int offset, int channel = 0)
   {
-    Clear();
+    Reset();
     mStatus = channel | (kNoteOn << 4) ;
     mData1 = noteNumber;
     mData2 = velocity;
@@ -157,7 +157,7 @@ struct IMidiMsg
    * @param channel MIDI channel [0, 15] */
   void MakeNoteOffMsg(int noteNumber, int offset, int channel = 0)
   {
-    Clear();
+    Reset();
     mStatus = channel | (kNoteOff << 4);
     mData1 = noteNumber;
     mOffset = offset;
@@ -169,7 +169,7 @@ struct IMidiMsg
    * @param offset Sample offset in block */
   void MakePitchWheelMsg(double value, int channel = 0, int offset = 0)
   {
-    Clear();
+    Reset();
     mStatus = channel | (kPitchWheel << 4);
     int i = 8192 + (int) (value * 8192.0);
     i = std::min(std::max(i, 0), 16383);
@@ -185,7 +185,7 @@ struct IMidiMsg
    * @param offset Sample offset in block */
   void MakeControlChangeMsg(EControlChangeMsg idx, double value, int channel = 0, int offset = 0)
   {
-    Clear();
+    Reset();
     mStatus = channel | (kControlChange << 4);
     mData1 = idx;
     mData2 = (int) (value * 127.0);
@@ -198,7 +198,7 @@ struct IMidiMsg
    * @param offset Sample offset in block */
   void MakeProgramChange(int program, int channel = 0, int offset = 0)
   {
-    Clear();
+    Reset();
     mStatus = channel | (kProgramChange << 4);
     mData1 = program;
     mOffset = offset;
@@ -210,7 +210,7 @@ struct IMidiMsg
    * @param channel MIDI channel [0, 15] */
   void MakeChannelATMsg(int pressure, int offset, int channel)
   {
-    Clear();
+    Reset();
     mStatus = channel | (kChannelAftertouch << 4);
     mData1 = pressure;
     mData2 = 0;
@@ -224,7 +224,7 @@ struct IMidiMsg
    * @param channel MIDI channel [0, 15] */
   void MakePolyATMsg(int noteNumber, int pressure, int offset, int channel)
   {
-    Clear();
+    Reset();
     mStatus = channel | (kPolyAftertouch << 4);
     mData1 = noteNumber;
     mData2 = pressure;
@@ -355,7 +355,7 @@ struct IMidiMsg
   }
   
   /** Clear the message */
-  void Clear()
+  void Reset()
   {
     mOffset = 0;
     mStatus = mData1 = mData2 = 0;
@@ -551,7 +551,7 @@ struct ISysEx
   {}
   
   /** Clear the data pointer and size (does not modify the external data!)  */
-  void Clear()
+  void Reset()
   {
     mOffset = mSize = 0;
     mData = NULL;
@@ -746,7 +746,7 @@ public:
   }
 
   // Clears the queue.
-  inline void Clear() { mFront = mBack = 0; }
+  inline void Reset() { mFront = mBack = 0; }
 
   // Resizes (grows or shrinks) the queue, returns the new size.
   int Resize(int size)

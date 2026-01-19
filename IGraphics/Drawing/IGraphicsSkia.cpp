@@ -487,12 +487,12 @@ void IGraphicsSkia::DrawBitmap(const IBitmap& bitmap, const IRECT& dest, int src
   mCanvas->restore();
 }
 
-void IGraphicsSkia::PathArc(float cx, float cy, float r, float a1, float a2, EWinding winding)
+void IGraphicsSkia::PathArc(float cx, float cy, float r, float fA, float a2, EWinding winding)
 {
   SkPath arc;
   arc.setIsVolatile(true);
   
-  float sweep = (a2 - a1);
+  float sweep = (a2 - fA);
 
   if (sweep >= 360.f || sweep <= -360.f)
   {
@@ -512,7 +512,7 @@ void IGraphicsSkia::PathArc(float cx, float cy, float r, float a1, float a2, EWi
         sweep -= 360.f;
     }
       
-    arc.arcTo(SkRect::MakeLTRB(cx - r, cy - r, cx + r, cy + r), a1 - 90.f, sweep, false);
+    arc.arcTo(SkRect::MakeLTRB(cx - r, cy - r, cx + r, cy + r), fA - 90.f, sweep, false);
     mMainPath.addPath(arc, mMatrix, SkPath::kExtend_AddPathMode);
   }
 }
@@ -708,12 +708,12 @@ void IGraphicsSkia::DrawRoundRect(const IColor& color, const IRECT& bounds, floa
   mCanvas->drawRoundRect(SkiaRect(bounds), cornerRadius, cornerRadius, paint);
 }
 
-void IGraphicsSkia::DrawArc(const IColor& color, float cx, float cy, float r, float a1, float a2, const IBlend* pBlend, float thickness)
+void IGraphicsSkia::DrawArc(const IColor& color, float cx, float cy, float r, float fA, float a2, const IBlend* pBlend, float thickness)
 {
   auto paint = SkiaPaint(color, pBlend);
   paint.setStyle(SkPaint::Style::kStroke_Style);
   paint.setStrokeWidth(thickness);
-  mCanvas->drawArc(SkRect::MakeLTRB(cx - r, cy - r, cx + r, cy + r), a1 - 90.f, (a2 - a1), false, paint);
+  mCanvas->drawArc(SkRect::MakeLTRB(cx - r, cy - r, cx + r, cy + r), fA - 90.f, (a2 - fA), false, paint);
 }
 
 void IGraphicsSkia::DrawCircle(const IColor& color, float cx, float cy, float r, const IBlend* pBlend, float thickness)
@@ -746,11 +746,11 @@ void IGraphicsSkia::FillRoundRect(const IColor& color, const IRECT& bounds, floa
   mCanvas->drawRoundRect(SkiaRect(bounds), cornerRadius, cornerRadius, paint);
 }
 
-void IGraphicsSkia::FillArc(const IColor& color, float cx, float cy, float r, float a1, float a2, const IBlend* pBlend)
+void IGraphicsSkia::FillArc(const IColor& color, float cx, float cy, float r, float fA, float a2, const IBlend* pBlend)
 {
   auto paint = SkiaPaint(color, pBlend);
   paint.setStyle(SkPaint::Style::kFill_Style);
-  mCanvas->drawArc(SkRect::MakeLTRB(cx - r, cy - r, cx + r, cy + r), a1 - 90.f, (a2 - a1), true, paint);
+  mCanvas->drawArc(SkRect::MakeLTRB(cx - r, cy - r, cx + r, cy + r), fA - 90.f, (a2 - fA), true, paint);
 }
 
 void IGraphicsSkia::FillCircle(const IColor& color, float cx, float cy, float r, const IBlend* pBlend)

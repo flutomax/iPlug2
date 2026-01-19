@@ -796,7 +796,7 @@ struct IRECT
   }
 
   /** Set all fields of this IRECT to 0 */
-  void Clear()
+  void Reset()
   {
     L = T = R = B = 0.f;
   }
@@ -1790,7 +1790,7 @@ public:
   }
   
   /** Clear the list */
-  void Clear()
+  void Reset()
   {
     mRects.Resize(0);
   }

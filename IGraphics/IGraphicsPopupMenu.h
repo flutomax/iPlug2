@@ -283,7 +283,7 @@ public:
   
   void SetMultiCheck(bool multicheck) { mCanMultiCheck = multicheck; }
 
-  void Clear(bool resetEverything = true)
+  void Reset(bool resetEverything = true)
   {
     if (resetEverything)
     {

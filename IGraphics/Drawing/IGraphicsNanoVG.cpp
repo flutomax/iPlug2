@@ -465,7 +465,7 @@ void IGraphicsNanoVG::OnViewDestroyed()
   RemoveAllControls();
 
   StaticStorage<APIBitmap>::Accessor storage(mBitmapCache);
-  storage.Clear();
+  storage.Reset();
   
   if(mMainFrameBuffer != nullptr)
     nvgDeleteFramebuffer(mMainFrameBuffer);
@@ -578,9 +578,9 @@ void IGraphicsNanoVG::PathClose()
   nvgClosePath(mVG);
 }
 
-void IGraphicsNanoVG::PathArc(float cx, float cy, float r, float a1, float a2, EWinding winding)
+void IGraphicsNanoVG::PathArc(float cx, float cy, float r, float fA, float a2, EWinding winding)
 {
-  nvgArc(mVG, cx, cy, r, DegToRad(a1 - 90.f), DegToRad(a2 - 90.f), winding == EWinding::CW ? NVG_CW : NVG_CCW);
+  nvgArc(mVG, cx, cy, r, DegToRad(fA - 90.f), DegToRad(a2 - 90.f), winding == EWinding::CW ? NVG_CW : NVG_CCW);
 }
 
 void IGraphicsNanoVG::PathMoveTo(float x, float y)

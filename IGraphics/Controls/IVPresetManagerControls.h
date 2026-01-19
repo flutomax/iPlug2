@@ -105,7 +105,7 @@ public:
     };
 
     auto choosePresetFunc = [&](IControl* pCaller) {
-      mMenu.Clear();
+      mMenu.Reset();
       
       IPluginBase* pluginBase = dynamic_cast<IPluginBase*>(pCaller->GetDelegate());
 

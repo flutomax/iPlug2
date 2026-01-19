@@ -937,7 +937,7 @@ typedef struct ASIOInputMonitor
 {
 	long input;		// this input was set to monitor (or off), -1: all
 	long output;	// suggested output for monitoring the input (if so)
-	long gain;		// suggested gain, ranging 0 - 0x7fffffffL (-inf to +12 dB)
+	long fGain;		// suggested gain, ranging 0 - 0x7fffffffL (-inf to +12 dB)
 	ASIOBool state;	// ASIOTrue => on, ASIOFalse => off
 	long pan;		// suggested pan, 0 => all left, 0x7fffffff => right
 } ASIOInputMonitor;
@@ -946,7 +946,7 @@ typedef struct ASIOChannelControls
 {
 	long channel;			// on input, channel index
 	ASIOBool isInput;		// on input
-	long gain;				// on input,  ranges 0 thru 0x7fffffff
+	long fGain;				// on input,  ranges 0 thru 0x7fffffff
 	long meter;				// on return, ranges 0 thru 0x7fffffff
 	char future[32];
 } ASIOChannelControls;

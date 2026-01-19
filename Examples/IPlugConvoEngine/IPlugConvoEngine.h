@@ -49,8 +49,8 @@ private:
   static const float mIR[512];
 
   WDL_ImpulseBuffer mImpulse;
-  WDL_ConvolutionEngine_Div mEngine; // < low latency version
-//  WDL_ConvolutionEngine mEngine;
+//  WDL_ConvolutionEngine_Div mEngine; // < low latency version
+  WDL_ConvolutionEngine mEngine;
   
   static constexpr int mBlockLength = 64;
 

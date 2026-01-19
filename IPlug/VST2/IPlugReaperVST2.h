@@ -49,12 +49,12 @@ public:
       DoFxLastTweakParmCtxMenu2(pFXDSP, pView, xpos, ypos, NULL);
   }
   
-  void SetTrackVolume(double gain)
+  void SetTrackVolume(double fGain)
   {
     MediaTrack* tr = GetReaperTrack();
 
     if (tr != nullptr)
-      SetMediaTrackInfo_Value(tr, "D_VOL", gain);
+      SetMediaTrackInfo_Value(tr, "D_VOL", fGain);
   }
   
   void GetTakeName(WDL_String& str)

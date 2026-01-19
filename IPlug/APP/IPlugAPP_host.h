@@ -215,6 +215,9 @@ public:
   static WDL_DLGRET MainDlgProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
   IPlugAPP* GetPlug() { return mIPlug.get(); }
+
+  AppState& GetState() { return mState; }
+  void SetState(const AppState& value) { mState = value; }
 private:
   std::unique_ptr<IPlugAPP> mIPlug = nullptr;
   std::unique_ptr<RtAudio> mDAC = nullptr;

@@ -10,6 +10,7 @@
 
 
 #include <Shlobj.h>
+#include <shobjidl.h>
 #include <commctrl.h>
 
 #include "heapbuf.h"
@@ -1754,6 +1755,7 @@ void IGraphicsWin::PromptForFile(WDL_String& fileName, WDL_String& path, EFileAc
 
 void IGraphicsWin::PromptForDirectory(WDL_String& dir, IFileDialogCompletionHandlerFunc completionHandler)
 {
+  /* // old version
   BROWSEINFOW bi;
   memset(&bi, 0, sizeof(bi));
   
@@ -1792,6 +1794,45 @@ void IGraphicsWin::PromptForDirectory(WDL_String& dir, IFileDialogCompletionHand
   ReleaseMouseCapture();
   
   ::OleUninitialize();
+  */
+
+  HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+
+  IFileDialog * pFileDialog = NULL;
+  hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_ALL, IID_IFileDialog, reinterpret_cast<void**>(&pFileDialog));
+
+  if (SUCCEEDED(hr))
+  {
+
+    DWORD dwOptions;
+    pFileDialog->GetOptions(&dwOptions);
+    pFileDialog->SetOptions(dwOptions | FOS_PICKFOLDERS);
+
+    hr = pFileDialog->Show(mPlugWnd);
+
+    if (SUCCEEDED(hr))
+    {
+      IShellItem* pItem;
+      hr = pFileDialog->GetResult(&pItem);
+
+      if (SUCCEEDED(hr))
+      {
+        PWSTR pszFilePath;
+        hr = pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath);
+
+        if (SUCCEEDED(hr))
+        {
+          dir.Set(UTF16AsUTF8(pszFilePath).Get());
+          dir.Append("\\");
+          CoTaskMemFree(pszFilePath);
+        }
+        pItem->Release();
+      }
+    }
+    pFileDialog->Release();
+  }
+
+  CoUninitialize();
 }
 
 static UINT_PTR CALLBACK CCHookProc(HWND hdlg, UINT uiMsg, WPARAM wParam, LPARAM lParam)

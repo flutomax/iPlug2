@@ -173,7 +173,7 @@ private:
     
     SParamValList()
     {
-      Clear();
+      Reset();
     }
     
     void Add(TParamValPair* inElem)
@@ -213,7 +213,7 @@ private:
       } while (1);
     }
     
-    void Clear()
+    void Reset()
     {
       std::memset(mElem, 0x0, sizeof(mElem));
       mSize = 0;

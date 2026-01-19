@@ -62,16 +62,16 @@ public:
 
     for (i = 0; i < 6; i++) {
       float a0 = (float)i / 6.0f * NVG_PI * 2.0f - aeps;
-      float a1 = (float)(i+1.0f) / 6.0f * NVG_PI * 2.0f + aeps;
+      float fA = (float)(i+1.0f) / 6.0f * NVG_PI * 2.0f + aeps;
       nvgBeginPath(vg);
-      nvgArc(vg, cx,cy, r0, a0, a1, NVG_CW);
-      nvgArc(vg, cx,cy, r1, a1, a0, NVG_CCW);
+      nvgArc(vg, cx,cy, r0, a0, fA, NVG_CW);
+      nvgArc(vg, cx,cy, r1, fA, a0, NVG_CCW);
       nvgClosePath(vg);
       ax = cx + cosf(a0) * (r0+r1)*0.5f;
       ay = cy + sinf(a0) * (r0+r1)*0.5f;
-      bx = cx + cosf(a1) * (r0+r1)*0.5f;
-      by = cy + sinf(a1) * (r0+r1)*0.5f;
-      paint = nvgLinearGradient(vg, ax,ay, bx,by, nvgHSLA(a0/(NVG_PI*2),1.0f,0.55f,255), nvgHSLA(a1/(NVG_PI*2),1.0f,0.55f,255));
+      bx = cx + cosf(fA) * (r0+r1)*0.5f;
+      by = cy + sinf(fA) * (r0+r1)*0.5f;
+      paint = nvgLinearGradient(vg, ax,ay, bx,by, nvgHSLA(a0/(NVG_PI*2),1.0f,0.55f,255), nvgHSLA(fA/(NVG_PI*2),1.0f,0.55f,255));
       nvgFillPaint(vg, paint);
       nvgFill(vg);
     }

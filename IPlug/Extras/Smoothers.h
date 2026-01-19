@@ -9,6 +9,7 @@
 */
 #pragma once
 
+#include <math.h>
 #include "denormal.h"
 #include "IPlugConstants.h"
 

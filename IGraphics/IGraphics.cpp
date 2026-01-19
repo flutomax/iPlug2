@@ -639,7 +639,7 @@ void IGraphics::PromptUserInput(IControl& control, const IRECT& bounds, int valI
     if ( type == IParam::kTypeEnum || (type == IParam::kTypeBool && nDisplayTexts))
     {
       pParam->GetDisplay(currentText);
-      mPromptPopupMenu.Clear();
+      mPromptPopupMenu.Reset();
 
       // Fill the menu
       for (int i = 0; i < nDisplayTexts; ++i)
@@ -1406,7 +1406,7 @@ void IGraphics::SetPTParameterHighlight(int paramIdx, bool isHighlighted, int co
 void IGraphics::PopupHostContextMenuForParam(IControl* pControl, int paramIdx, float x, float y)
 {
   IPopupMenu& contextMenu = mPromptPopupMenu;
-  contextMenu.Clear();
+  contextMenu.Reset();
 
   if(pControl)
   {
@@ -2414,7 +2414,7 @@ void IGraphics::AttachGestureRecognizerToRegion(const IRECT& bounds, EGestureTyp
 
 void IGraphics::ClearGestureRegions()
 {
-  mGestureRegions.Clear();
+  mGestureRegions.Reset();
   mGestureRegionFuncs.clear();
 }
 
@@ -2544,10 +2544,10 @@ void IGraphics::DrawConvexPolygon(const IColor& color, float* x, float* y, int n
   PathStroke(color, thickness, IStrokeOptions(), pBlend);
 }
 
-void IGraphics::DrawArc(const IColor& color, float cx, float cy, float r, float a1, float a2, const IBlend* pBlend, float thickness)
+void IGraphics::DrawArc(const IColor& color, float cx, float cy, float r, float fA, float a2, const IBlend* pBlend, float thickness)
 {
   PathClear();
-  PathArc(cx, cy, r, a1, a2);
+  PathArc(cx, cy, r, fA, a2);
   PathStroke(color, thickness, IStrokeOptions(), pBlend);
 }
 
@@ -2616,11 +2616,11 @@ void IGraphics::FillConvexPolygon(const IColor& color, float* x, float* y, int n
   PathFill(color, IFillOptions(), pBlend);
 }
 
-void IGraphics::FillArc(const IColor& color, float cx, float cy, float r, float a1, float a2, const IBlend* pBlend)
+void IGraphics::FillArc(const IColor& color, float cx, float cy, float r, float fA, float a2, const IBlend* pBlend)
 {
   PathClear();
   PathMoveTo(cx, cy);
-  PathArc(cx, cy, r, a1, a2);
+  PathArc(cx, cy, r, fA, a2);
   PathClose();
   PathFill(color, IFillOptions(), pBlend);
 }

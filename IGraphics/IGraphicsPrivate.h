@@ -505,7 +505,7 @@ public:
     T* Find(const char* str, double scale = 1.)               { return mStorage.Find(str, scale); }
     void Add(T* pData, const char* str, double scale = 1.)    { return mStorage.Add(pData, str, scale); }
     void Remove(T* pData)                                     { return mStorage.Remove(pData); }
-    void Clear()                                              { return mStorage.Clear(); }
+    void Reset()                                              { return mStorage.Reset(); }
     void Retain()                                             { return mStorage.Retain(); }
     void Release()                                            { return mStorage.Release(); }
       
@@ -517,7 +517,7 @@ public:
     
   ~StaticStorage()
   {
-    Clear();
+    Reset();
   }
 
   StaticStorage(const StaticStorage&) = delete;
@@ -599,7 +599,7 @@ private:
   }
 
   /** \todo  */
-  void Clear()
+  void Reset()
   {
     mDatas.Empty(true);
   };
@@ -614,7 +614,7 @@ private:
   void Release()
   {
     if (--mCount == 0)
-      Clear();
+      Reset();
   }
     
   int mCount = 0;

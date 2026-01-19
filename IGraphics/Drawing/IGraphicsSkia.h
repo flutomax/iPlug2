@@ -57,7 +57,7 @@ public:
 
   void PathClear() override { mMainPath.reset(); }
   void PathClose() override { mMainPath.close(); }
-  void PathArc(float cx, float cy, float r, float a1, float a2, EWinding winding) override;
+  void PathArc(float cx, float cy, float r, float fA, float a2, EWinding winding) override;
 
   void PathMoveTo(float x, float y) override { mMainPath.moveTo(mMatrix.mapXY(x, y)); }
   void PathLineTo(float x, float y) override { mMainPath.lineTo(mMatrix.mapXY(x, y)); }
@@ -86,7 +86,7 @@ public:
   void DrawRoundRect(const IColor& color, const IRECT& bounds, float cornerRadius, const IBlend* pBlend, float thickness) override;
   //void DrawRoundRect(const IColor& color, const IRECT& bounds, float cRTL, float cRTR, float cRBR, float cRBL, const IBlend* pBlend, float thickness) override;
   //void DrawConvexPolygon(const IColor& color, float* x, float* y, int nPoints, const IBlend* pBlend, float thickness) override;
-  void DrawArc(const IColor& color, float cx, float cy, float r, float a1, float a2, const IBlend* pBlend, float thickness) override;
+  void DrawArc(const IColor& color, float cx, float cy, float r, float fA, float a2, const IBlend* pBlend, float thickness) override;
   void DrawCircle(const IColor& color, float cx, float cy, float r, const IBlend* pBlend, float thickness) override;
   //void DrawDottedRect(const IColor& color, const IRECT& bounds, const IBlend* pBlend, float thickness, float dashLen) override;
   void DrawEllipse(const IColor& color, const IRECT& bounds, const IBlend* pBlend, float thickness) override;
@@ -97,7 +97,7 @@ public:
   void FillRoundRect(const IColor& color, const IRECT& bounds, float cornerRadius, const IBlend* pBlend) override;
   //void FillRoundRect(const IColor& color, const IRECT& bounds, float cRTL, float cRTR, float cRBR, float cRBL, const IBlend* pBlend) override;
   //void FillConvexPolygon(const IColor& color, float* x, float* y, int nPoints, const IBlend* pBlend) override;
-  void FillArc(const IColor& color, float cx, float cy, float r, float a1, float a2, const IBlend* pBlend) override;
+  void FillArc(const IColor& color, float cx, float cy, float r, float fA, float a2, const IBlend* pBlend) override;
   void FillCircle(const IColor& color, float cx, float cy, float r, const IBlend* pBlend) override;
   void FillEllipse(const IColor& color, const IRECT& bounds, const IBlend* pBlend) override;
   //void FillEllipse(const IColor& color, float x, float y, float r1, float r2, float angle, const IBlend* pBlend) override;

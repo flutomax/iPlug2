@@ -1043,7 +1043,7 @@ void IDirBrowseControlBase::SetupMenu()
   mFiles.Empty(true);
   mItems.Empty(false);
   
-  mMainMenu.Clear();
+  mMainMenu.Reset();
   mSelectedItemIndex = -1;
 
   int idx = 0;
